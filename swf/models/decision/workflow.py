@@ -66,7 +66,7 @@ class WorkflowExecutionDecision(Decision):
         task_list=None,
         workflow_type_version=None,
     ):
-        """Coninue as new workflow execution decision builder
+        """Continue as new workflow execution decision builder
         :param  child_policy: specifies the policy to use for the
                               child workflow executions of the new execution
         :type   child_policy: CHILD_POLICIES.{TERMINATE | REQUEST_CANCEL | ABANDON}
@@ -86,7 +86,7 @@ class WorkflowExecutionDecision(Decision):
         :param  task_timeout: maximum duration of decision tasks for the new workflow execution
         :type   task_timeout: str
 
-        :param  workflow_type_version: workflow type version the execution shold belong to
+        :param  workflow_type_version: workflow type version the execution should belong to
         :type   workflow_type_version: str
         """
         if input is not None:
@@ -95,12 +95,18 @@ class WorkflowExecutionDecision(Decision):
         self.update_attributes(
             {
                 "childPolicy": child_policy,
-                "executionStartToCloseTimeout": execution_timeout,
-                "taskStartToCloseTimeout": task_timeout,
+                "executionStartToCloseTimeout": str(execution_timeout)
+                if execution_timeout is not None
+                else None,
+                "taskStartToCloseTimeout": str(task_timeout)
+                if task_timeout is not None
+                else None,
                 "input": input,
                 "tagList": tag_list,
-                "taskList": task_list,
-                "workflowTypeVersion": workflow_type_version,
+                "taskList": {"name": task_list},
+                "workflowTypeVersion": str(workflow_type_version)
+                if workflow_type_version is not None
+                else None,
             }
         )
 

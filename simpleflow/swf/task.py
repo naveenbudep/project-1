@@ -1,6 +1,8 @@
 import swf.models
 import swf.models.decision
-from simpleflow import Workflow, logger, task
+from simpleflow import Workflow, logger, settings, task
+from swf.models.decision import WorkflowExecutionDecision
+from swf.models.workflow import CHILD_POLICIES
 
 
 class SwfTask(object):
@@ -237,6 +239,26 @@ class WorkflowTask(task.WorkflowTask, SwfTask):
                 domain, name, version=version,
             )
         return cls.cached_models[key]
+
+
+class ContinueAsNewWorkflowTask(WorkflowTask):
+    def schedule(self, domain, task_list=None, executor=None, **kwargs):
+        workflow = self.workflow
+        tag_list = self.tag_list
+        if tag_list == Workflow.INHERIT_TAG_LIST:
+            tag_list = executor.get_run_context()["tag_list"]
+
+        decision = WorkflowExecutionDecision(
+            "continue_as_new",
+            child_policy=getattr(workflow, "child_policy", CHILD_POLICIES.TERMINATE),
+            execution_timeout=getattr(workflow, "execution_timeout", None),
+            task_timeout=settings.WORKFLOW_DEFAULT_DECISION_TASK_TIMEOUT,  # type: ignore
+            input=self.get_input(),
+            tag_list=tag_list,
+            task_list=task_list or self.task_list,
+            workflow_type_version=getattr(workflow, "version", None),
+        )
+        return [decision]
 
 
 class SignalTask(task.SignalTask, SwfTask):
