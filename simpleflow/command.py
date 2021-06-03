@@ -138,6 +138,7 @@ def transform_input(wf_input):
         }
     return wf_input
 
+
 def run_workflow_locally(workflow_class, wf_input, middlewares):
     from .local import Executor
 
@@ -205,8 +206,8 @@ def start_workflow(
 
     if local:
         middlewares = {
-                "pre": middleware_pre_execution,
-                "post": middleware_post_execution
+            "pre": middleware_pre_execution,
+            "post": middleware_post_execution,
         }
         run_workflow_locally(workflow_class, wf_input, middlewares)
         return
@@ -228,7 +229,8 @@ def start_workflow(
     )
     print(
         "{workflow_id} {run_id}".format(
-            workflow_id=execution.workflow_id, run_id=execution.run_id,
+            workflow_id=execution.workflow_id,
+            run_id=execution.run_id,
         )
     )
     return execution
@@ -237,7 +239,8 @@ def start_workflow(
 @click.argument("run_id", required=False)
 @click.argument("workflow_id")
 @click.argument(
-    "domain", envvar="SWF_DOMAIN",
+    "domain",
+    envvar="SWF_DOMAIN",
 )
 @cli.command(
     "workflow.terminate",
@@ -251,7 +254,8 @@ def terminate_workflow(domain, workflow_id, run_id):
 @click.argument("run_id", required=False)
 @click.argument("workflow_id")
 @click.argument(
-    "domain", envvar="SWF_DOMAIN",
+    "domain",
+    envvar="SWF_DOMAIN",
 )
 @cli.command(
     "workflow.restart",
@@ -271,7 +275,8 @@ def restart_workflow(domain, workflow_id, run_id):
     )
     print(
         "{workflow_id} {run_id}".format(
-            workflow_id=new_ex.workflow_id, run_id=new_ex.run_id,
+            workflow_id=new_ex.workflow_id,
+            run_id=new_ex.run_id,
         )
     )
 
@@ -286,12 +291,19 @@ def with_format(ctx):
 @click.argument("run_id", required=False)
 @click.argument("workflow_id")
 @click.argument(
-    "domain", envvar="SWF_DOMAIN",
+    "domain",
+    envvar="SWF_DOMAIN",
 )
 @cli.command("workflow.info", help="Info about a workflow execution.")
 @click.pass_context
 def workflow_info(ctx, domain, workflow_id, run_id):
-    print(with_format(ctx)(helpers.show_workflow_info)(domain, workflow_id, run_id,))
+    print(
+        with_format(ctx)(helpers.show_workflow_info)(
+            domain,
+            workflow_id,
+            run_id,
+        )
+    )
 
 
 @click.option(
@@ -304,14 +316,18 @@ def workflow_info(ctx, domain, workflow_id, run_id):
 @click.argument("run_id", required=False)
 @click.argument("workflow_id")
 @click.argument(
-    "domain", envvar="SWF_DOMAIN",
+    "domain",
+    envvar="SWF_DOMAIN",
 )
 @cli.command("workflow.profile", help="Profile of a workflow.")
 @click.pass_context
 def profile(ctx, domain, workflow_id, run_id, nb_tasks):
     print(
         with_format(ctx)(helpers.show_workflow_profile)(
-            domain, workflow_id, run_id, nb_tasks,
+            domain,
+            workflow_id,
+            run_id,
+            nb_tasks,
         )
     )
 
@@ -326,20 +342,25 @@ def profile(ctx, domain, workflow_id, run_id, nb_tasks):
 @click.argument("run_id", required=False)
 @click.argument("workflow_id")
 @click.argument(
-    "domain", envvar="SWF_DOMAIN",
+    "domain",
+    envvar="SWF_DOMAIN",
 )
 @cli.command("workflow.tasks", help="Tasks of a workflow execution.")
 @click.pass_context
 def status(ctx, domain, workflow_id, run_id, nb_tasks):
     print(
         with_format(ctx)(helpers.show_workflow_status)(
-            domain, workflow_id, run_id, nb_tasks,
+            domain,
+            workflow_id,
+            run_id,
+            nb_tasks,
         )
     )
 
 
 @click.argument(
-    "domain", envvar="SWF_DOMAIN",
+    "domain",
+    envvar="SWF_DOMAIN",
 )
 @cli.command("workflow.list", help="Active workflow executions.")
 @click.option(
@@ -363,7 +384,8 @@ def list_workflows(ctx, domain, status, started_since):
 
 
 @click.argument(
-    "domain", envvar="SWF_DOMAIN",
+    "domain",
+    envvar="SWF_DOMAIN",
 )
 @cli.command("workflow.filter", help="Filter workflow executions.")
 @click.option(
@@ -383,6 +405,7 @@ def list_workflows(ctx, domain, status, started_since):
 @click.option(
     "--started-since", "-d", default=30, show_default=True, help="Started since N days."
 )
+@click.option("--limit", "-n", default=None, show_default=True, type=int, help="Limit.")
 @click.pass_context
 def filter_workflows(
     ctx,
@@ -393,6 +416,7 @@ def filter_workflows(
     workflow_type_name,
     workflow_type_version,
     started_since,
+    limit,
 ):
     status = status.upper()
     kwargs = {}
@@ -408,6 +432,7 @@ def filter_workflows(
             workflow_id=workflow_id,
             workflow_type_name=workflow_type_name,
             workflow_type_version=workflow_type_version,
+            limit=limit,
             **kwargs
         )
     )
@@ -416,7 +441,8 @@ def filter_workflows(
 @click.argument("task_id")
 @click.argument("workflow_id")
 @click.argument(
-    "domain", envvar="SWF_DOMAIN",
+    "domain",
+    envvar="SWF_DOMAIN",
 )
 @click.option("--details/--no-details", default=False, help="Display details.")
 @cli.command("task.info", help="Informations on a task.")
@@ -439,7 +465,11 @@ def start_decider(workflows, domain, task_list, log_level, nb_processes):
             "Deprecated: --log-level will be removed, use LOG_LEVEL environment variable instead"
         )
     decider.command.start(
-        workflows, domain, task_list, None, nb_processes,
+        workflows,
+        domain,
+        task_list,
+        None,
+        nb_processes,
     )
 
 
@@ -497,13 +527,17 @@ def start_worker(
     if not task_list and not poll_data:
         raise ValueError("Please provide a --task-list or some data via --poll-data")
 
-    middlewares = {
-            "pre": middleware_pre_execution,
-            "post": middleware_post_execution
-    }
+    middlewares = {"pre": middleware_pre_execution, "post": middleware_post_execution}
 
     worker.command.start(
-        domain, task_list, middlewares, nb_processes, heartbeat, one_task, process_mode, poll_data,
+        domain,
+        task_list,
+        middlewares,
+        nb_processes,
+        heartbeat,
+        one_task,
+        process_mode,
+        poll_data,
     )
 
 
@@ -660,7 +694,11 @@ def standalone(
     logger.info("using task list {}".format(task_list))
     decider_proc = multiprocessing.Process(
         target=decider.command.start,
-        args=([workflow], domain, task_list,),
+        args=(
+            [workflow],
+            domain,
+            task_list,
+        ),
         kwargs={
             "nb_processes": nb_deciders,
             "repair_with": previous_history,
@@ -674,11 +712,17 @@ def standalone(
 
     worker_proc = multiprocessing.Process(
         target=worker.command.start,
-        args=(domain, task_list,),
+        args=(
+            domain,
+            task_list,
+        ),
         kwargs={
-            "nb_processes": nb_workers, 
+            "nb_processes": nb_workers,
             "heartbeat": heartbeat,
-            "middlewares": {"pre": middleware_pre_execution, "post": middleware_post_execution}
+            "middlewares": {
+                "pre": middleware_pre_execution,
+                "post": middleware_post_execution,
+            },
         },
     )
     worker_proc.start()
@@ -700,12 +744,17 @@ def standalone(
     )
     while True:
         time.sleep(2)
-        ex = helpers.get_workflow_execution(domain, ex.workflow_id, ex.run_id,)
+        ex = helpers.get_workflow_execution(
+            domain,
+            ex.workflow_id,
+            ex.run_id,
+        )
         if display_status:
             print("status: {}".format(ex.status), file=sys.stderr)
         if ex.status == ex.STATUS_CLOSED:
             print("execution {} finished".format(ex.workflow_id), file=sys.stderr)
-            break
+            if 1:  # not continue_as_new:
+                break
 
     os.kill(worker_proc.pid, signal.SIGTERM)
     worker_proc.join()
@@ -761,7 +810,10 @@ def activity_rerun(domain, workflow_id, run_id, input, scheduled_id, activity_id
         input=input_override,
     )
     kwargs["context"].update(
-        {"workflow_id": wfe.workflow_id, "run_id": wfe.run_id,}
+        {
+            "workflow_id": wfe.workflow_id,
+            "run_id": wfe.run_id,
+        }
     )
     logger.debug("Found activity. Last execution:")
     for line in json_dumps(params, pretty=True).split("\n"):

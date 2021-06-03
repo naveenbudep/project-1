@@ -21,6 +21,9 @@ class BaseQuerySet(ConnectedSWFObject):
     def filter(self, *args, **kwargs):
         raise NotImplementedError
 
+    def iter_filter(self, *args, **kwargs):
+        raise NotImplementedError
+
     def all(self, *args, **kwargs):
         raise NotImplementedError
 

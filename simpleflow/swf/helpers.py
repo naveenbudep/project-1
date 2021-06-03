@@ -5,6 +5,7 @@ import getpass
 import json
 import os
 import socket
+from itertools import islice
 
 import psutil
 from future.utils import iteritems, itervalues
@@ -52,17 +53,29 @@ def get_workflow_execution(domain_name, workflow_id, run_id=None):
 
 
 def show_workflow_info(domain_name, workflow_id, run_id=None):
-    workflow_execution = get_workflow_execution(domain_name, workflow_id, run_id,)
+    workflow_execution = get_workflow_execution(
+        domain_name,
+        workflow_id,
+        run_id,
+    )
     return pretty.info(workflow_execution)
 
 
 def show_workflow_profile(domain_name, workflow_id, run_id=None, nb_tasks=None):
-    workflow_execution = get_workflow_execution(domain_name, workflow_id, run_id,)
+    workflow_execution = get_workflow_execution(
+        domain_name,
+        workflow_id,
+        run_id,
+    )
     return pretty.profile(workflow_execution, nb_tasks)
 
 
 def show_workflow_status(domain_name, workflow_id, run_id=None, nb_tasks=None):
-    workflow_execution = get_workflow_execution(domain_name, workflow_id, run_id,)
+    workflow_execution = get_workflow_execution(
+        domain_name,
+        workflow_id,
+        run_id,
+    )
     return pretty.status(workflow_execution, nb_tasks)
 
 
@@ -81,19 +94,23 @@ def filter_workflow_executions(
     workflow_id,
     workflow_type_name,
     workflow_type_version,
+    limit=None,
     *args,
     **kwargs
 ):
     domain = swf.models.Domain(domain_name)
     query = swf.querysets.WorkflowExecutionQuerySet(domain)
-    executions = query.filter(
-        status,
-        tag,
-        workflow_id,
-        workflow_type_name,
-        workflow_type_version,
-        *args,
-        **kwargs
+    executions = islice(
+        query.iter_filter(
+            status,
+            tag,
+            workflow_id,
+            workflow_type_name,
+            workflow_type_version,
+            *args,
+            **kwargs
+        ),
+        limit,
     )
 
     return pretty.list_details(executions)
@@ -144,7 +161,10 @@ def find_activity(history, scheduled_id=None, activity_id=None, input=None):
 
 
 def get_task(domain_name, workflow_id, task_id, details):
-    workflow_execution = get_workflow_execution(domain_name, workflow_id,)
+    workflow_execution = get_workflow_execution(
+        domain_name,
+        workflow_id,
+    )
     return pretty.get_task(workflow_execution, task_id, details)
 
 

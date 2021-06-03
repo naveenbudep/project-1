@@ -448,7 +448,10 @@ class WorkflowExecutionQuerySet(BaseWorkflowQuerySet):
         workflow_type = execution_info["workflowType"]
         workflow_type_qs = WorkflowTypeQuerySet(self.domain)
 
-        return workflow_type_qs.get(workflow_type["name"], workflow_type["version"],)
+        return workflow_type_qs.get(
+            workflow_type["name"],
+            workflow_type["version"],
+        )
 
     def to_WorkflowExecution(self, domain, execution_info, **kwargs):
         workflow_type = WorkflowType(
@@ -509,7 +512,93 @@ class WorkflowExecutionQuerySet(BaseWorkflowQuerySet):
         *args,
         **kwargs
     ):
-        """Filters workflow executions based on kwargs provided criteras
+        """Filters workflow executions based on kwargs provided criteria
+
+        :param  status: workflow executions with provided status will be kept.
+                        Valid values are:
+                        * ``swf.models.WorkflowExecution.STATUS_OPEN``
+                        * ``swf.models.WorkflowExecution.STATUS_CLOSED``
+        :type   status: string
+
+        :param  tag: workflow executions containing the tag will be kept
+        :type   tag: String
+
+        :param  workflow_id: workflow executions attached to the id will be kept
+        :type   workflow_id: String
+
+        :param  workflow_type_name: workflow executions attached to the workflow type
+                                    with provided name will be kept
+        :type   workflow_type_name: String
+
+        :param  workflow_type_version: workflow executions attached to the workflow type
+                                       of the provided version will be kept
+        :type   workflow_type_version: String
+
+        **Be aware that** querying over status allows the usage of statuses specific
+        kwargs
+
+        * STATUS_OPEN
+
+            :param start_latest_date: latest start or close date and time to return (in days)
+            :type  start_latest_date: int
+
+        * STATUS_CLOSED
+
+            :param  start_latest_date: workflow executions that meet the start time criteria
+                                       of the filter are kept (in days)
+            :type   start_latest_date: int
+
+            :param  start_oldest_date: workflow executions that meet the start time criteria
+                                       of the filter are kept (in days)
+            :type   start_oldest_date: int
+
+            :param  close_latest_date: workflow executions that meet the close time criteria
+                                       of the filter are kept (in days)
+            :type   close_latest_date: int
+
+            :param  close_oldest_date: workflow executions that meet the close time criteria
+                                       of the filter are kept (in days)
+            :type   close_oldest_date: int
+
+            :param  close_status: must match the close status of an execution for it
+                                  to meet the criteria of this filter.
+                                  Valid values are:
+                                  * ``CLOSE_STATUS_COMPLETED``
+                                  * ``CLOSE_STATUS_FAILED``
+                                  * ``CLOSE_STATUS_CANCELED``
+                                  * ``CLOSE_STATUS_TERMINATED``
+                                  * ``CLOSE_STATUS_CONTINUED_AS_NEW``
+                                  * ``CLOSE_TIMED_OUT``
+            :type   close_status: string
+
+            :returns: workflow executions objects list
+            :rtype: list
+        """
+        # As WorkflowTypeQuery has to be built against a specific domain
+        # name, domain filter is disposable, but not mandatory.
+        return list(
+            self.iter_filter(
+                status=status,
+                tag=tag,
+                workflow_id=workflow_id,
+                workflow_type_name=workflow_type_name,
+                workflow_type_version=workflow_type_version,
+                *args,
+                **kwargs
+            )
+        )
+
+    def iter_filter(
+        self,
+        status=WorkflowExecution.STATUS_OPEN,
+        tag=None,
+        workflow_id=None,
+        workflow_type_name=None,
+        workflow_type_version=None,
+        *args,
+        **kwargs
+    ):
+        """Iteratively filters workflow executions based on kwargs provided criteria
 
         :param  status: workflow executions with provided status will be kept.
                         Valid values are:
@@ -605,20 +694,18 @@ class WorkflowExecutionQuerySet(BaseWorkflowQuerySet):
         else:
             start_oldest_date = None
 
-        return [
-            self.to_WorkflowExecution(self.domain, wfe)
-            for wfe in self._list_items(
-                *args,
-                domain=self.domain.name,
-                status=status,
-                workflow_id=workflow_id,
-                workflow_name=workflow_type_name,
-                workflow_version=workflow_type_version,
-                start_oldest_date=start_oldest_date,
-                tag=tag,
-                **kwargs
-            )
-        ]
+        for wfe in self._list_items(
+            *args,
+            domain=self.domain.name,
+            status=status,
+            workflow_id=workflow_id,
+            workflow_name=workflow_type_name,
+            workflow_version=workflow_type_version,
+            start_oldest_date=start_oldest_date,
+            tag=tag,
+            **kwargs
+        ):
+            yield self.to_WorkflowExecution(self.domain, wfe)
 
     def _list(self, *args, **kwargs):
         return self.list_workflow_executions(*args, **kwargs)
