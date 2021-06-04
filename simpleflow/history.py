@@ -342,9 +342,6 @@ class History(object):
                 "version": event.workflow_type["version"],
                 "state": event.state,
                 "initiated_event_id": event.id,
-                "raw_input": event.raw.get(
-                    "input"
-                ),  # FIXME obsolete; any user out there?
                 "input": event.input,
                 "child_policy": event.child_policy,
                 "control": event.control,
