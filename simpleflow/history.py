@@ -40,6 +40,7 @@ class History(object):
     def __init__(
         self,
         history,  # type: Optional[swf.models.history.History]
+        past_history=None,  # type: Optional[Dict[AnyStr, Any]]
     ):
         # type: (...) -> None
         self._history = history
@@ -71,6 +72,8 @@ class History(object):
         self.started_decision_id = None  # type: Optional[int]
         self.completed_decision_id = None  # type: Optional[int]
         self.continued_execution_run_id = None  # type: Optional[AnyStr]
+        if past_history:
+            self._load_history(past_history)
 
     def to_dict(self):
         # type: () -> Dict[AnyStr, Any]
@@ -96,33 +99,41 @@ class History(object):
         cls,
         d,  # type: Dict[AnyStr, Any]
     ):
+        # type: (...) -> History
         hist = cls(None)
-        # hist._activities = d["activities"]
-        # hist._child_workflows = d["child_workflows"]
-        hist._external_workflows_signaling = d["external_workflows_signaling"]
-        hist._external_workflows_canceling = d["external_workflows_canceling"]
-        # hist._signals = d["signals"]
-        hist._signaled_workflows = d["signaled_workflows"]
-        hist._markers = d["markers"]
-        hist._timers = d["timers"]
-        hist._tasks = d["tasks"]
-        hist._cancel_requested = d["cancel_requested"]
-        hist._cancel_failed = d["cancel_failed"]
-        hist.started_decision_id = d["started_decision_id"]
-        hist.completed_decision_id = d["completed_decision_id"]
-        hist.continued_execution_run_id = d["continued_execution_run_id"]
-        for task in hist._tasks:
+        hist._load_history(d)
+        return hist
+
+    def _load_history(
+        self,
+        d,  # type: Dict[AnyStr, Any]
+    ):
+        # type: (...) -> None
+        # self._activities = d["activities"]
+        # self._child_workflows = d["child_workflows"]
+        self._external_workflows_signaling = d["external_workflows_signaling"]
+        self._external_workflows_canceling = d["external_workflows_canceling"]
+        # self._signals = d["signals"]
+        self._signaled_workflows = d["signaled_workflows"]
+        self._markers = d["markers"]
+        self._timers = d["timers"]
+        self._tasks = d["tasks"]
+        self._cancel_requested = d["cancel_requested"]
+        self._cancel_failed = d["cancel_failed"]
+        self.started_decision_id = d["started_decision_id"]
+        self.completed_decision_id = d["completed_decision_id"]
+        self.continued_execution_run_id = d["continued_execution_run_id"]
+        for task in self._tasks:
             id_ = task["id"]
             type_ = task["type"]
             if type_ == "activity":
-                hist._activities[id_] = task
+                self._activities[id_] = task
             elif type_ == "child_workflow":
-                hist._child_workflows[id_] = task
+                self._child_workflows[id_] = task
             elif type_ == "signal":
-                hist._signals[task["name"]] = task
+                self._signals[task["name"]] = task
             else:
                 logger.error("Unexpected task event: %r", type_)
-        return hist
 
     @property
     def swf_history(self):
@@ -257,8 +268,8 @@ class History(object):
             ]  # type: swf.models.event.ActivityTaskEvent
             return self._activities[scheduled_event.activity_id]
 
-        activity_id = event.activity_id
         if event.state == "scheduled":
+            activity_id = event.activity_id
             activity = {
                 "type": "activity",
                 "id": activity_id,
@@ -284,6 +295,7 @@ class History(object):
                 # corresponds to the last execution.
                 self._activities[activity_id].update(activity)
         elif event.state == "schedule_failed":
+            activity_id = event.activity_id
             activity = {
                 "state": event.state,
                 "cause": event.cause,
@@ -373,6 +385,7 @@ class History(object):
                 }
             )
         elif event.state == "cancel_requested":
+            activity_id = event.activity_id
             activity = {
                 "type": "activity",
                 "id": activity_id,

@@ -56,15 +56,21 @@ class ActivityTask(task.ActivityTask, SwfTask):
 
         if task_list is None:
             task_list = activity.task_list
-        task_timeout = kwargs.get("task_timeout", activity.task_start_to_close_timeout,)
+        task_timeout = kwargs.get(
+            "task_timeout",
+            activity.task_start_to_close_timeout,
+        )
         duration_timeout = kwargs.get(
-            "duration_timeout", activity.task_schedule_to_close_timeout,
+            "duration_timeout",
+            activity.task_schedule_to_close_timeout,
         )
         schedule_timeout = kwargs.get(
-            "schedule_timeout", activity.task_schedule_to_start_timeout,
+            "schedule_timeout",
+            activity.task_schedule_to_start_timeout,
         )
         heartbeat_timeout = kwargs.get(
-            "heartbeat_timeout", activity.task_heartbeat_timeout,
+            "heartbeat_timeout",
+            activity.task_heartbeat_timeout,
         )
         task_priority = kwargs.get("priority")
         control = kwargs.get("control")
@@ -113,7 +119,9 @@ class ActivityTask(task.ActivityTask, SwfTask):
         key = (domain.name, name, version)
         if key not in cls.cached_models:
             cls.cached_models[key] = swf.models.ActivityType(
-                domain, name, version=version,
+                domain,
+                name,
+                version=version,
             )
         return cls.cached_models[key]
 
@@ -236,24 +244,42 @@ class WorkflowTask(task.WorkflowTask, SwfTask):
         key = (domain.name, name, version)
         if key not in cls.cached_models:
             cls.cached_models[key] = swf.models.WorkflowType(
-                domain, name, version=version,
+                domain,
+                name,
+                version=version,
             )
         return cls.cached_models[key]
 
 
 class ContinueAsNewWorkflowTask(WorkflowTask):
-    def schedule(self, domain, task_list=None, executor=None, **kwargs):
+    def __init__(
+        self, executor, workflow, past_history=None, keep_steps=False, *args, **kwargs
+    ):
+        super(ContinueAsNewWorkflowTask, self).__init__(
+            executor, workflow, *args, **kwargs
+        )
+        self.past_history = past_history
+        self.keep_steps = keep_steps
+
+    def schedule(self, domain, task_list=None, executor=None, *args, **kwargs):
         workflow = self.workflow
         tag_list = self.tag_list
-        if tag_list == Workflow.INHERIT_TAG_LIST:
+        if tag_list == Workflow.INHERIT_TAG_LIST and executor:
             tag_list = executor.get_run_context()["tag_list"]
 
+        input = self.get_input()
+        if "meta" not in input:
+            input["meta"] = {}
+        if self.past_history:
+            input["meta"]["past_history"] = self.past_history
+        if self.keep_steps:
+            input["meta"]["keep_steps"] = self.keep_steps  # TODO: use initial run id
         decision = WorkflowExecutionDecision(
             "continue_as_new",
             child_policy=getattr(workflow, "child_policy", CHILD_POLICIES.TERMINATE),
             execution_timeout=getattr(workflow, "execution_timeout", None),
             task_timeout=settings.WORKFLOW_DEFAULT_DECISION_TASK_TIMEOUT,  # type: ignore
-            input=self.get_input(),
+            input=input,
             tag_list=tag_list,
             task_list=task_list or self.task_list,
             workflow_type_version=getattr(workflow, "version", None),
@@ -349,7 +375,8 @@ class MarkerTask(task.MarkerTask, SwfTask):
     def schedule(self, *args, **kwargs):
         decision = swf.models.decision.MarkerDecision()
         decision.record(
-            self.name, self.details,
+            self.name,
+            self.details,
         )
         return [decision]
 
@@ -387,5 +414,8 @@ class CancelTimerTask(task.CancelTimerTask, SwfTask):
         super(CancelTimerTask, self).__init__(timer_id)
 
     def schedule(self, *args, **kwargs):
-        decision = swf.models.decision.TimerDecision("cancel", id=self.timer_id,)
+        decision = swf.models.decision.TimerDecision(
+            "cancel",
+            id=self.timer_id,
+        )
         return [decision]

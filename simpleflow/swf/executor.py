@@ -13,6 +13,9 @@ import simpleflow.task as base_task
 import swf.exceptions
 import swf.models
 import swf.models.decision
+import swf.models.event
+import swf.models.history
+import swf.responses
 from simpleflow import compat, exceptions, executor, format, futures, logger, task
 from simpleflow.activity import PRIORITY_NOT_SET, Activity
 from simpleflow.base import Submittable
@@ -47,9 +50,14 @@ __all__ = ["Executor"]
 @retry.with_delay(nb_times=3, delay=retry.exponential, on_exceptions=KeyError)
 def run_fake_activity_task(domain, task_list, result):
     conn = ConnectedSWFObject().connection
-    resp = conn.poll_for_activity_task(domain, task_list, identity=swf_identity(),)
+    resp = conn.poll_for_activity_task(
+        domain,
+        task_list,
+        identity=swf_identity(),
+    )
     conn.respond_activity_task_completed(
-        resp["taskToken"], result,
+        resp["taskToken"],
+        result,
     )
 
 
@@ -57,13 +65,19 @@ def run_fake_activity_task(domain, task_list, result):
 @retry.with_delay(nb_times=3, delay=retry.exponential, on_exceptions=KeyError)
 def run_fake_child_workflow_task(domain, task_list, result=None):
     conn = ConnectedSWFObject().connection
-    resp = conn.poll_for_decision_task(domain, task_list, identity=swf_identity(),)
+    resp = conn.poll_for_decision_task(
+        domain,
+        task_list,
+        identity=swf_identity(),
+    )
     conn.respond_decision_task_completed(
         resp["taskToken"],
         decisions=[
             {
                 "decisionType": "CompleteWorkflowExecution",
-                "completeWorkflowExecutionDecisionAttributes": {"result": result,},
+                "completeWorkflowExecutionDecisionAttributes": {
+                    "result": result,
+                },
             }
         ],
     )
@@ -73,13 +87,22 @@ def run_fake_task_worker(domain, task_list, former_event):
     if former_event["type"] == "activity":
         worker_proc = multiprocessing.Process(
             target=run_fake_activity_task,
-            args=(domain, task_list, former_event["result"],),
+            args=(
+                domain,
+                task_list,
+                former_event["result"],
+            ),
         )
     elif former_event["type"] == "child_workflow":
         worker_proc = multiprocessing.Process(
             target=run_fake_child_workflow_task,
-            args=(domain, task_list,),
-            kwargs={"result": former_event["result"],},
+            args=(
+                domain,
+                task_list,
+            ),
+            kwargs={
+                "result": former_event["result"],
+            },
         )
     else:
         raise Exception("Wrong event type {}".format(former_event["type"]))
@@ -88,9 +111,7 @@ def run_fake_task_worker(domain, task_list, former_event):
 
 
 class TaskRegistry(dict):
-    """This registry tracks tasks and assign them an integer identifier.
-
-    """
+    """This registry tracks tasks and assign them an integer identifier."""
 
     def add(self, a_task):
         """
@@ -270,7 +291,12 @@ class Executor(executor.Executor):
                         )
                     )
                 return None
-            logger.info("failed to schedule {}: {}".format(name, event["cause"],))
+            logger.info(
+                "failed to schedule {}: {}".format(
+                    name,
+                    event["cause"],
+                )
+            )
             return None
         elif state == "started":
             future.set_running()
@@ -313,11 +339,14 @@ class Executor(executor.Executor):
         elif state == "start_failed":
             if event["cause"] == "WORKFLOW_TYPE_DOES_NOT_EXIST":
                 workflow_type = swf.models.WorkflowType(
-                    self.domain, name=event["name"], version=event["version"],
+                    self.domain,
+                    name=event["name"],
+                    version=event["version"],
                 )
                 logger.info(
                     "Creating workflow type {} in domain {}".format(
-                        workflow_type.name, self.domain.name,
+                        workflow_type.name,
+                        self.domain.name,
                     )
                 )
                 try:
@@ -346,9 +375,18 @@ class Executor(executor.Executor):
                 )
             )
         elif state == "timed_out":
-            future.set_exception(exceptions.TimeoutError(event["timeout_type"], None,))
+            future.set_exception(
+                exceptions.TimeoutError(
+                    event["timeout_type"],
+                    None,
+                )
+            )
         elif state == "canceled":
-            future.set_exception(exceptions.TaskCanceled(event.get("details"),))
+            future.set_exception(
+                exceptions.TaskCanceled(
+                    event.get("details"),
+                )
+            )
         elif state == "terminated":
             future.set_exception(exceptions.TaskTerminated())
         else:
@@ -378,7 +416,10 @@ class Executor(executor.Executor):
             future.set_finished(event["details"])
         elif state == "failed":
             future.set_exception(
-                exceptions.TaskFailed(name=event["name"], reason=event["cause"],)
+                exceptions.TaskFailed(
+                    name=event["name"],
+                    reason=event["cause"],
+                )
             )
 
         return future
@@ -423,7 +464,10 @@ class Executor(executor.Executor):
             future.set_finished(event["input"])
         elif state == "signal_execution_failed":
             future.set_exception(
-                exceptions.TaskFailed(name=event["name"], reason=event["cause"],)
+                exceptions.TaskFailed(
+                    name=event["name"],
+                    reason=event["cause"],
+                )
             )
 
         return future
@@ -451,7 +495,10 @@ class Executor(executor.Executor):
             future.set_cancelled()
         elif state in ("start_failed", "cancel_failed"):
             future.set_exception(
-                exceptions.TaskFailed(name=event["timer_id"], reason=event["cause"],)
+                exceptions.TaskFailed(
+                    name=event["timer_id"],
+                    reason=event["cause"],
+                )
             )
 
         return future
@@ -1113,19 +1160,28 @@ class Executor(executor.Executor):
         self.reset()
 
         # noinspection PyUnresolvedReferences
-        history = decision_response.history
-        self._history = History(history)
-        self._history.parse()
-        self.build_run_context(decision_response)
-        # noinspection PyUnresolvedReferences
-        self._execution = decision_response.execution
-
-        workflow_started_event = history[0]
+        history = decision_response.history  # type: swf.models.history.History
+        workflow_started_event = history[
+            0
+        ]  # type: swf.models.event.WorkflowExecutionEvent
         input = workflow_started_event.input
         if input is None:
             input = {}
         args = input.get("args", ())
         kwargs = input.get("kwargs", {})
+
+        past_history = None
+        continued_execution_run_id = getattr(
+            workflow_started_event, "continued_execution_run_id", None
+        )
+        if continued_execution_run_id:
+            past_history = input.get("meta", {}).get("past_history")
+
+        self._history = History(history, past_history)
+        self._history.parse()
+        self.build_run_context(decision_response)
+        # noinspection PyUnresolvedReferences
+        self._execution = decision_response.execution
 
         self.before_replay()
 
@@ -1179,7 +1235,8 @@ class Executor(executor.Executor):
 
             decision = swf.models.decision.WorkflowExecutionDecision()
             decision.fail(
-                reason=reason, details=details,
+                reason=reason,
+                details=details,
             )
             self.after_closed()
             if decref_workflow:
@@ -1188,7 +1245,8 @@ class Executor(executor.Executor):
 
         except Exception as err:
             reason = "Cannot replay the workflow: {}({})".format(
-                err.__class__.__name__, err,
+                err.__class__.__name__,
+                err,
             )
 
             tb = traceback.format_exc()
@@ -1201,7 +1259,8 @@ class Executor(executor.Executor):
 
             decision = swf.models.decision.WorkflowExecutionDecision()
             decision.fail(
-                reason=reason, details=details,
+                reason=reason,
+                details=details,
             )
             self.after_closed()
             if decref_workflow:
@@ -1276,7 +1335,8 @@ class Executor(executor.Executor):
 
         decision = swf.models.decision.WorkflowExecutionDecision()
         decision.fail(
-            reason="Workflow execution failed: {}".format(reason), details=details,
+            reason="Workflow execution failed: {}".format(reason),
+            details=details,
         )
 
         self._decisions_and_context.append_decision(decision)
