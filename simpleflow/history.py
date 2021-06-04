@@ -1,119 +1,150 @@
 import collections
+from typing import TYPE_CHECKING
 
+import swf.models.event
+import swf.models.history
 from simpleflow import logger
 
+if TYPE_CHECKING:
+    from typing import (
+        Any,
+        AnyStr,
+        DefaultDict,
+        Dict,
+        List,
+        Optional,
+        OrderedDict,
+        Union,
+    )
 
-# noinspection PyUnresolvedReferences
+
 class History(object):
     """
     History data.
 
     :ivar _history: raw(ish) history events
-    :type _history: swf.models.history.History
     :ivar _activities: activity events
-    :type _activities: collections.OrderedDict[str, dict[str, Any]]
     :ivar _child_workflows: child workflow events
-    :type _child_workflows: collections.OrderedDict[str, dict[str, Any]]
     :ivar _external_workflows_signaling: external workflow signaling events, by initiated event ID
-    :type _external_workflows_signaling: collections.OrderedDict[int, dict[str, Any]]
     :ivar _external_workflows_canceling: external workflow canceling events
-    :type _external_workflows_canceling: collections.OrderedDict[str, dict[str, Any]]
     :ivar _signals: activity events
-    :type _signals: collections.OrderedDict[str, dict[str, Any]]
     :ivar _markers: marker events
-    :type _markers: collections.OrderedDict[str, list[dict[str, Any]]]
     :ivar _timers: timer events
-    :type _timers: dict[str, dict[str, Any]]]
     :ivar _tasks: ordered list of tasks/etc
-    :type _tasks: list[dict[str, Any]]
     """
 
-    def __init__(self, history):
+    def __init__(
+        self,
+        history,  # type: Optional[swf.models.history.History]
+    ):
+        # type: (...) -> None
         self._history = history
-        self._activities = collections.OrderedDict()
-        self._child_workflows = collections.OrderedDict()
-        self._external_workflows_signaling = collections.OrderedDict()
-        self._external_workflows_canceling = collections.OrderedDict()
-        self._signals = collections.OrderedDict()
-        self._signaled_workflows = collections.defaultdict(list)
-        self._markers = collections.OrderedDict()
-        self._timers = {}
-        self._tasks = []
-        self._cancel_requested = None
-        self._cancel_failed = None
-        self.started_decision_id = None
-        self.completed_decision_id = None
+        self._activities = (
+            collections.OrderedDict()
+        )  # type: OrderedDict[AnyStr, dict[str, Any]]
+        self._child_workflows = (
+            collections.OrderedDict()
+        )  # type: OrderedDict[AnyStr, Dict[AnyStr, Any]]
+        self._external_workflows_signaling = (
+            collections.OrderedDict()
+        )  # type: OrderedDict[int, Dict[AnyStr, Any]]
+        self._external_workflows_canceling = (
+            collections.OrderedDict()
+        )  # type: OrderedDict[AnyStr, Dict[AnyStr, Any]]
+        self._signals = (
+            collections.OrderedDict()
+        )  # type: OrderedDict[AnyStr, Dict[AnyStr, Any]]
+        self._signaled_workflows = collections.defaultdict(
+            list
+        )  # type: DefaultDict[List[Dict[AnyStr, Any]]]
+        self._markers = (
+            collections.OrderedDict()
+        )  # type: OrderedDict[AnyStr, List[Dict[AnyStr, Any]]]
+        self._timers = {}  # type: Dict[AnyStr, Dict[AnyStr, Any]]
+        self._tasks = []  # type: List[Dict[AnyStr, Any]]
+        self._cancel_requested = None  # type: Optional[Dict[AnyStr, Any]]
+        self._cancel_failed = None  # type: Optional[Dict[AnyStr, Any]]
+        self.started_decision_id = None  # type: Optional[int]
+        self.completed_decision_id = None  # type: Optional[int]
+        self.continued_execution_run_id = None  # type: Optional[AnyStr]
 
     @property
     def swf_history(self):
+        # type: () -> Optional[swf.models.history.History]
         """
-
         :return: SWF history
-        :rtype: swf.models.history.History
         """
         return self._history
 
     @property
     def activities(self):
+        # type: () -> OrderedDict[AnyStr, Dict[AnyStr, Any]]
         """
         :return: activities
-        :rtype: collections.OrderedDict[str, dict[str, Any]]
         """
         return self._activities
 
     @property
     def child_workflows(self):
+        # type: () -> OrderedDict[AnyStr, Dict[AnyStr, Any]]
         """
         :return: child WFs
-        :rtype: collections.OrderedDict[str, dict[str, Any]]
         """
         return self._child_workflows
 
     @property
     def external_workflows_signaling(self):
+        # type: () -> OrderedDict[int, Dict[AnyStr, Any]]
         """
         :return: external WFs
-        :rtype: collections.OrderedDict[str, dict[str, Any]]
         """
         return self._external_workflows_signaling
 
     @property
+    def external_workflows_canceling(self):
+        # type: () -> OrderedDict[int, Dict[AnyStr, Any]]
+        """
+        :return: external WFs
+        """
+        return self._external_workflows_canceling
+
+    @property
     def signals(self):
+        # type: () -> OrderedDict[AnyStr, Dict[AnyStr, Any]]
         """
         :return: signals
-        :rtype: collections.OrderedDict[str, dict[str, Any]]
         """
         return self._signals
 
     @property
     def cancel_requested(self):
+        # type: () -> Optional[Dict[AnyStr, Any]]
         """
         :return: Last cancel requested event, if any.
-        :rtype: Optional[dict]
         """
         return self._cancel_requested
 
     @property
     def cancel_failed(self):
+        # type: () -> Optional[Dict[AnyStr, Any]]
         """
         :return: Last cancel failed event, if any.
-        :rtype: Optional[dict]
         """
         return self._cancel_failed
 
     @property
     def cancel_requested_id(self):
+        # type: () -> Optional[int]
         """
         :return: ID of last cancel requested event, if any.
-        :rtype: Optional[int]
         """
         return self._cancel_requested["event_id"] if self._cancel_requested else None
 
     @property
     def cancel_failed_decision_task_completed_event_id(self):
+        # type: () -> Optional[int]
         """
         :return: ID of last cancel failed event, if any.
-        :rtype: Optional[int]
         """
         return (
             self._cancel_failed["decision_task_completed_event_id"]
@@ -123,60 +154,51 @@ class History(object):
 
     @property
     def signaled_workflows(self):
+        # type: () -> DefaultDict[List[Dict[AnyStr, Any]]]
         """
         :return: signaled workflows
-        :rtype: defaultdict(list)
         """
         return self._signaled_workflows
 
     @property
     def markers(self):
-        """
-
-        :return: Markers
-        :rtype: collections.OrderedDict[str, list[dict[str, Any]]]
-        """
+        # type: () -> OrderedDict[AnyStr, List[Dict[AnyStr, Any]]]
         return self._markers
 
     @property
     def timers(self):
-        # type: () -> Dict[str, Dict[str, Any]]
+        # type: () -> Dict[str, Dict[AnyStr, Any]]
         return self._timers
 
     @property
     def tasks(self):
-        """
-        :return:
-         :rtype: list[dict[str, Any]]
-        """
+        # type: () -> List[Dict[AnyStr, Any]]
         return self._tasks
 
     @property
     def events(self):
-        """
+        # type: () -> Optional[List[swf.models.event.Event]]
+        return self._history.events if self._history else None
 
-        :return:
-        :rtype: list[swf.models.event.Event]
-        """
-        return self._history.events
-
-    def parse_activity_event(self, events, event):
+    def parse_activity_event(
+        self,
+        events,  # type: List[Union[swf.models.event.Event, swf.models.event.ActivityTaskEvent]]
+        event,  # type: swf.models.event.ActivityTaskEvent
+    ):
+        # type: (...) -> None
         """
         Aggregate all the attributes of an activity in a single entry.
-
-        :param events:
-        :type events: list[swf.models.event.Event]
-        :param event:
-        :type event: swf.models.event.Event
         """
 
         def get_activity():
+            # type: () -> Dict[AnyStr, Any]
             """
             Return a reference to the corresponding activity.
             :return: mutable activity
-            :rtype: dict[str, Any]
             """
-            scheduled_event = events[event.scheduled_event_id - 1]
+            scheduled_event = events[
+                event.scheduled_event_id - 1
+            ]  # type: swf.models.event.ActivityTaskEvent
             return self._activities[scheduled_event.activity_id]
 
         if event.state == "scheduled":
@@ -299,7 +321,11 @@ class History(object):
             else:
                 self._activities[event.activity_id].update(activity)
 
-    def parse_child_workflow_event(self, events, event):
+    def parse_child_workflow_event(
+        self,
+        events,  # type: List[Union[swf.models.event.Event, swf.models.event.ChildWorkflowExecutionEvent]]
+        event,  # type: swf.models.event.ChildWorkflowExecutionEvent
+    ):
         """Aggregate all the attributes of a workflow in a single entry.
 
         See http://docs.aws.amazon.com/amazonswf/latest/apireference/API_HistoryEvent.html
@@ -463,13 +489,20 @@ class History(object):
                 }
             )
 
-    def parse_workflow_event(self, events, event):
+    def parse_workflow_event(
+        self,
+        _,
+        event,  # type: swf.models.event.WorkflowExecutionEvent
+    ):
+        # type: (...) -> None
         """
         Parse a workflow event.
-        :param events:
-        :param event:
         """
-        if event.state == "signaled":
+        if event.state == "started":
+            self.continued_execution_run_id = getattr(
+                event, "continued_execution_run_id", None
+            )
+        elif event.state == "signaled":
             signal = {
                 "type": "signal",
                 "name": event.signal_name,
@@ -483,7 +516,7 @@ class History(object):
                 "external_workflow_id": getattr(
                     event, "external_workflow_execution", {}
                 ).get("workflowId"),
-                "input": event.input,
+                "input": getattr(event, "input", None),
                 "event_id": event.id,
                 "timestamp": event.timestamp,
             }
@@ -516,11 +549,13 @@ class History(object):
             }
             self._cancel_failed = cancel_failed
 
-    def parse_external_workflow_event(self, events, event):
+    def parse_external_workflow_event(
+        self,
+        events,  # type: List[Union[swf.models.event.Event, swf.models.event.ExternalWorkflowExecutionEvent]]
+        event,  # type: swf.models.event.ExternalWorkflowExecutionEvent
+    ):
         """
         Parse an external workflow event.
-        :param events:
-        :param event:
         """
 
         def get_workflow(workflows):
@@ -589,7 +624,10 @@ class History(object):
         elif event.state == "request_cancel_execution_failed":
             workflow = get_workflow(self._external_workflows_canceling)
             workflow.update(
-                {"state": event.state, "cause": event.cause,}
+                {
+                    "state": event.state,
+                    "cause": event.cause,
+                }
             )
             if event.control:
                 workflow["control"] = event.control
@@ -605,7 +643,12 @@ class History(object):
                 }
             )
 
-    def parse_marker_event(self, events, event):
+    def parse_marker_event(
+        self,
+        _,
+        event,  # type: swf.models.event.MarkerEvent
+    ):
+        # type: (...) -> None
         if event.state == "recorded":
             marker = {
                 "type": "marker",
@@ -627,14 +670,19 @@ class History(object):
             }
             self._markers.setdefault(event.marker_name, []).append(marker)
 
-    def parse_timer_event(self, events, event):
+    def parse_timer_event(
+        self,
+        _,
+        event,  # type: swf.models.event.TimerEvent
+    ):
+        # type: (...) -> None
         if event.state == "started":
             timer = {
                 "type": "timer",
                 "id": event.timer_id,
                 "state": event.state,
                 "start_to_fire_timeout": int(event.start_to_fire_timeout),
-                "control": event.control,
+                "control": getattr(event, "control", None),
                 "started_event_id": event.id,
                 "started_event_timestamp": event.timestamp,
                 "decision_task_completed_event_id": event.decision_task_completed_event_id,
@@ -688,12 +736,18 @@ class History(object):
             timer.update(
                 {
                     "state": event.state,
+                    "cause": event.cause,
                     "cancel_failed_event_id": event.id,
                     "cancel_failed_event_timestamp": event.timestamp,
                 }
             )
 
-    def parse_decision_event(self, events, event):
+    def parse_decision_event(
+        self,
+        _,
+        event,  # type: swf.models.event.DecisionTaskEvent
+    ):
+        # type: (...) -> None
         if event.state == "started":
             self.started_decision_id = event.id
         if event.state == "completed":
@@ -714,12 +768,14 @@ class History(object):
         Parse the events.
         Update the corresponding statuses.
         """
+        if not self._history:
+            return
 
         events = self.events
         for event in events:
             parser = self.TYPE_TO_PARSER.get(event.type)
             if parser:
-                parser(self, events, event)
+                parser(self, events, event)  # type: ignore
 
     @staticmethod
     def get_event_id(event):
