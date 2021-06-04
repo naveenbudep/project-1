@@ -75,11 +75,11 @@ class History(object):
     def to_dict(self):
         # type: () -> Dict[AnyStr, Any]
         return {
-            "activities": self.activities,
-            "child_workflows": self.child_workflows,
+            # "activities": self.activities,
+            # "child_workflows": self.child_workflows,
             "external_workflows_signaling": self.external_workflows_signaling,
             "external_workflows_canceling": self.external_workflows_canceling,
-            "signals": self.signals,
+            # "signals": self.signals,
             "signaled_workflows": self.signaled_workflows,
             "markers": self.markers,
             "timers": self.timers,
@@ -97,11 +97,11 @@ class History(object):
         d,  # type: Dict[AnyStr, Any]
     ):
         hist = cls(None)
-        hist._activities = d["activities"]
-        hist._child_workflows = d["child_workflows"]
+        # hist._activities = d["activities"]
+        # hist._child_workflows = d["child_workflows"]
         hist._external_workflows_signaling = d["external_workflows_signaling"]
         hist._external_workflows_canceling = d["external_workflows_canceling"]
-        hist._signals = d["signals"]
+        # hist._signals = d["signals"]
         hist._signaled_workflows = d["signaled_workflows"]
         hist._markers = d["markers"]
         hist._timers = d["timers"]
@@ -111,6 +111,17 @@ class History(object):
         hist.started_decision_id = d["started_decision_id"]
         hist.completed_decision_id = d["completed_decision_id"]
         hist.continued_execution_run_id = d["continued_execution_run_id"]
+        for task in hist._tasks:
+            id_ = task["id"]
+            type_ = task["type"]
+            if type_ == "activity":
+                hist._activities[id_] = task
+            elif type_ == "child_workflow":
+                hist._child_workflows[id_] = task
+            elif type_ == "signal":
+                hist._signals[task["name"]] = task
+            else:
+                logger.error("Unexpected task event: %r", type_)
         return hist
 
     @property
@@ -371,7 +382,6 @@ class History(object):
             }
             if activity_id not in self._activities:
                 self._activities[activity_id] = activity
-                self._tasks.append(activity)
             else:
                 self._activities[activity_id].update(activity)
 
@@ -480,11 +490,10 @@ class History(object):
             )
         elif event.state == "completed":
             workflow = get_workflow()
-            s = "result"
             workflow.update(
                 {
                     "state": event.state,
-                    "result": g_attr(event, s),
+                    "result": g_attr(event, "result"),
                     "completed_id": event.id,
                     "completed_timestamp": event.timestamp,
                 }
