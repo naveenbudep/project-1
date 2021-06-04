@@ -68,6 +68,47 @@ class History(object):
         self.completed_decision_id = None  # type: Optional[int]
         self.continued_execution_run_id = None  # type: Optional[AnyStr]
 
+    def to_dict(self):
+        # type: () -> Dict[AnyStr, Any]
+        return {
+            "activities": self.activities,
+            "child_workflows": self.child_workflows,
+            "external_workflows_signaling": self.external_workflows_signaling,
+            "external_workflows_canceling": self.external_workflows_canceling,
+            "signals": self.signals,
+            "signaled_workflows": self.signaled_workflows,
+            "markers": self.markers,
+            "timers": self.timers,
+            "tasks": self.tasks,
+            "cancel_requested": self.cancel_requested,
+            "cancel_failed": self.cancel_failed,
+            "started_decision_id": self.started_decision_id,
+            "completed_decision_id": self.completed_decision_id,
+            "continued_execution_run_id": self.continued_execution_run_id,
+        }
+
+    @classmethod
+    def from_dict(
+        cls,
+        d,  # type: Dict[AnyStr, Any]
+    ):
+        hist = cls(None)
+        hist._activities = d["activities"]
+        hist._child_workflows = d["child_workflows"]
+        hist._external_workflows_signaling = d["external_workflows_signaling"]
+        hist._external_workflows_canceling = d["external_workflows_canceling"]
+        hist._signals = d["signals"]
+        hist._signaled_workflows = d["signaled_workflows"]
+        hist._markers = d["markers"]
+        hist._timers = d["timers"]
+        hist._tasks = d["tasks"]
+        hist._cancel_requested = d["cancel_requested"]
+        hist._cancel_failed = d["cancel_failed"]
+        hist.started_decision_id = d["started_decision_id"]
+        hist.completed_decision_id = d["completed_decision_id"]
+        hist.continued_execution_run_id = d["continued_execution_run_id"]
+        return hist
+
     @property
     def swf_history(self):
         # type: () -> Optional[swf.models.history.History]
