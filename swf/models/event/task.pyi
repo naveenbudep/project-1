@@ -10,7 +10,7 @@ class ActivityTaskEvent(Event):
     task_list: Dict[str, str]  # {name}
 
     # started
-    identity: str
+    # identity: str
 
     # schedule_failed
     cause: str

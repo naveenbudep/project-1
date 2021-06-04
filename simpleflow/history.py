@@ -18,6 +18,10 @@ if TYPE_CHECKING:
     )
 
 
+def g_attr(event, s):
+    return getattr(event, s, None)
+
+
 class History(object):
     """
     History data.
@@ -242,10 +246,11 @@ class History(object):
             ]  # type: swf.models.event.ActivityTaskEvent
             return self._activities[scheduled_event.activity_id]
 
+        activity_id = event.activity_id
         if event.state == "scheduled":
             activity = {
                 "type": "activity",
-                "id": event.activity_id,
+                "id": activity_id,
                 "name": event.activity_type["name"],
                 "version": event.activity_type["version"],
                 "state": event.state,
@@ -255,9 +260,10 @@ class History(object):
                 "task_list": event.task_list["name"],
                 "control": event.control,
                 "decision_task_completed_event_id": event.decision_task_completed_event_id,
+                "task_priority": g_attr(event, "task_priority"),
             }
-            if event.activity_id not in self._activities:
-                self._activities[event.activity_id] = activity
+            if activity_id not in self._activities:
+                self._activities[activity_id] = activity
                 self._tasks.append(activity)
             else:
                 # When the executor retries a task, it schedules it again.
@@ -265,18 +271,25 @@ class History(object):
                 # previous execution of the task such as the number of retries
                 # in ``retry``.  As the state of the event mutates, it
                 # corresponds to the last execution.
-                self._activities[event.activity_id].update(activity)
+                self._activities[activity_id].update(activity)
         elif event.state == "schedule_failed":
             activity = {
-                "type": "activity",
                 "state": event.state,
                 "cause": event.cause,
-                "activity_type": event.activity_type.copy(),
                 "schedule_failed_timestamp": event.timestamp,
             }
 
-            if event.activity_id not in self._activities:
-                self._activities[event.activity_id] = activity
+            if activity_id not in self._activities:
+                activity.update(
+                    {
+                        "type": "activity",
+                        "id": activity_id,
+                        "name": event.activity_type["name"],
+                        "version": event.activity_type["version"],
+                        "decision_task_completed_event_id": event.decision_task_completed_event_id,
+                    }
+                )
+                self._activities[activity_id] = activity
                 self._tasks.append(activity)
             else:
                 # When the executor retries a task, it schedules it again.
@@ -284,14 +297,14 @@ class History(object):
                 # previous execution of the task such as the number of retries
                 # in ``retry``.  As the state of the event mutates, it
                 # corresponds to the last execution.
-                self._activities[event.activity_id].update(activity)
+                self._activities[activity_id].update(activity)
 
         elif event.state == "started":
             activity = get_activity()
             activity.update(
                 {
                     "state": event.state,
-                    "identity": event.identity,
+                    "identity": g_attr(event, "identity"),
                     "started_id": event.id,
                     "started_timestamp": event.timestamp,
                 }
@@ -301,7 +314,7 @@ class History(object):
             activity.update(
                 {
                     "state": event.state,
-                    "result": getattr(event, "result", None),
+                    "result": g_attr(event, "result"),
                     "completed_id": event.id,
                     "completed_timestamp": event.timestamp,
                 }
@@ -312,7 +325,7 @@ class History(object):
                 {
                     "state": event.state,
                     "timeout_type": event.timeout_type,
-                    "timeout_value": getattr(
+                    "timeout_value": g_attr(
                         events[activity["scheduled_id"] - 1],
                         "{}_timeout".format(event.timeout_type.lower()),
                     ),
@@ -351,16 +364,16 @@ class History(object):
         elif event.state == "cancel_requested":
             activity = {
                 "type": "activity",
-                "id": event.activity_id,
+                "id": activity_id,
                 "state": event.state,
                 "cancel_requested_timestamp": event.timestamp,
                 "cancel_decision_task_completed_event_id": event.decision_task_completed_event_id,
             }
-            if event.activity_id not in self._activities:
-                self._activities[event.activity_id] = activity
+            if activity_id not in self._activities:
+                self._activities[activity_id] = activity
                 self._tasks.append(activity)
             else:
-                self._activities[event.activity_id].update(activity)
+                self._activities[activity_id].update(activity)
 
     def parse_child_workflow_event(
         self,
@@ -369,7 +382,7 @@ class History(object):
     ):
         """Aggregate all the attributes of a workflow in a single entry.
 
-        See http://docs.aws.amazon.com/amazonswf/latest/apireference/API_HistoryEvent.html
+        See https://docs.aws.amazon.com/amazonswf/latest/apireference/API_HistoryEvent.html
 
         - StartChildWorkflowExecutionInitiated: A request was made to start a
           child workflow execution.
@@ -390,11 +403,6 @@ class History(object):
           by this workflow execution, was canceled and closed.
         - ChildWorkflowExecutionTerminated: A child workflow execution, started
           by this workflow execution, was terminated.
-
-        :param events:
-        :type events: list[swf.models.event.Event]
-        :param event:
-        :type event: swf.models.event.Event
         """
 
         def get_workflow():
@@ -412,7 +420,7 @@ class History(object):
                 "input": event.input,
                 "child_policy": event.child_policy,
                 "control": event.control,
-                "tag_list": getattr(event, "tag_list", None),
+                "tag_list": g_attr(event, "tag_list"),
                 "task_list": event.task_list["name"],
                 "initiated_event_timestamp": event.timestamp,
                 "decision_task_completed_event_id": event.decision_task_completed_event_id,
@@ -439,18 +447,22 @@ class History(object):
                 self._child_workflows[event.workflow_id].update(workflow)
         elif event.state == "start_failed":
             workflow = {
-                "type": "child_workflow",
-                "id": event.workflow_id,
                 "state": event.state,
                 "cause": event.cause,
-                "name": event.workflow_type["name"],
-                "version": event.workflow_type["version"],
                 "control": event.control,
                 "start_failed_id": event.id,
                 "start_failed_timestamp": event.timestamp,
-                "decision_task_completed_event_id": event.decision_task_completed_event_id,
             }
             if event.workflow_id not in self._child_workflows:
+                workflow.update(
+                    {
+                        "type": "child_workflow",
+                        "id": event.workflow_id,
+                        "name": event.workflow_type["name"],
+                        "version": event.workflow_type["version"],
+                        "decision_task_completed_event_id": event.decision_task_completed_event_id,
+                    }
+                )
                 self._child_workflows[event.workflow_id] = workflow
                 self._tasks.append(workflow)
             else:
@@ -468,10 +480,11 @@ class History(object):
             )
         elif event.state == "completed":
             workflow = get_workflow()
+            s = "result"
             workflow.update(
                 {
                     "state": event.state,
-                    "result": getattr(event, "result", None),
+                    "result": g_attr(event, s),
                     "completed_id": event.id,
                     "completed_timestamp": event.timestamp,
                 }
@@ -481,8 +494,8 @@ class History(object):
             workflow.update(
                 {
                     "state": event.state,
-                    "reason": getattr(event, "reason", None),
-                    "details": getattr(event, "details", None),
+                    "reason": g_attr(event, "reason"),
+                    "details": g_attr(event, "details"),
                     "failed_id": event.id,
                     "failed_timestamp": event.timestamp,
                 }
@@ -497,10 +510,9 @@ class History(object):
                 {
                     "state": event.state,
                     "timeout_type": event.timeout_type,
-                    "timeout_value": getattr(
+                    "timeout_value": g_attr(
                         events[workflow["initiated_event_id"] - 1],
                         "{}_timeout".format(event.timeout_type.lower()),
-                        None,
                     ),
                     "timed_out_id": event.id,
                     "timed_out_timestamp": event.timestamp,
@@ -515,7 +527,7 @@ class History(object):
             workflow.update(
                 {
                     "state": event.state,
-                    "details": getattr(event, "details", None),
+                    "details": g_attr(event, "details"),
                     "canceled_id": event.id,
                     "canceled_timestamp": event.timestamp,
                 }
@@ -540,16 +552,16 @@ class History(object):
         Parse a workflow event.
         """
         if event.state == "started":
-            self.continued_execution_run_id = getattr(
-                event, "continued_execution_run_id", None
+            self.continued_execution_run_id = g_attr(
+                event, "continued_execution_run_id"
             )
         elif event.state == "signaled":
             signal = {
                 "type": "signal",
                 "name": event.signal_name,
                 "state": event.state,
-                "external_initiated_event_id": getattr(
-                    event, "external_initiated_event_id", None
+                "external_initiated_event_id": g_attr(
+                    event, "external_initiated_event_id"
                 ),
                 "external_run_id": getattr(
                     event, "external_workflow_execution", {}
@@ -557,7 +569,7 @@ class History(object):
                 "external_workflow_id": getattr(
                     event, "external_workflow_execution", {}
                 ).get("workflowId"),
-                "input": getattr(event, "input", None),
+                "input": event.input,
                 "event_id": event.id,
                 "timestamp": event.timestamp,
             }
@@ -566,9 +578,9 @@ class History(object):
         elif event.state == "cancel_requested":
             cancel_requested = {
                 "type": event.state,
-                "cause": getattr(event, "cause", None),
-                "external_initiated_event_id": getattr(
-                    event, "external_initiated_event_id", None
+                "cause": g_attr(event, "cause"),
+                "external_initiated_event_id": g_attr(
+                    event, "external_initiated_event_id"
                 ),
                 "external_run_id": getattr(
                     event, "external_workflow_execution", {}
@@ -583,7 +595,7 @@ class History(object):
         elif event.state == "cancel_failed":
             cancel_failed = {
                 "type": event.state,
-                "cause": getattr(event, "cause", None),
+                "cause": g_attr(event, "cause"),
                 "event_id": event.id,
                 "decision_task_completed_event_id": event.decision_task_completed_event_id,
                 "timestamp": event.timestamp,
@@ -607,7 +619,7 @@ class History(object):
             workflow = {
                 "type": "external_workflow",
                 "id": event.workflow_id,
-                "run_id": getattr(event, "run_id", None),
+                "run_id": g_attr(event, "run_id"),
                 "signal_name": event.signal_name,
                 "state": event.state,
                 "initiated_event_id": event.id,
@@ -643,7 +655,7 @@ class History(object):
             workflow = {
                 "type": "external_workflow",
                 "id": event.workflow_id,
-                "run_id": getattr(event, "run_id", None),
+                "run_id": g_attr(event, "run_id"),
                 "state": event.state,
                 "control": event.control,
                 "initiated_event_id": event.id,
@@ -668,11 +680,11 @@ class History(object):
                 {
                     "state": event.state,
                     "cause": event.cause,
+                    "request_cancel_failed_timestamp": event.timestamp,
                 }
             )
             if event.control:
                 workflow["control"] = event.control
-            workflow["request_cancel_failed_timestamp"] = event.timestamp
         elif event.state == "execution_cancel_requested":
             workflow = get_workflow(self._external_workflows_canceling)
             workflow.update(
@@ -695,7 +707,7 @@ class History(object):
                 "type": "marker",
                 "name": event.marker_name,
                 "state": event.state,
-                "details": getattr(event, "details", None),
+                "details": g_attr(event, "details"),
                 "event_id": event.id,
                 "timestamp": event.timestamp,
             }
@@ -723,7 +735,7 @@ class History(object):
                 "id": event.timer_id,
                 "state": event.state,
                 "start_to_fire_timeout": int(event.start_to_fire_timeout),
-                "control": getattr(event, "control", None),
+                "control": event.control,
                 "started_event_id": event.id,
                 "started_event_timestamp": event.timestamp,
                 "decision_task_completed_event_id": event.decision_task_completed_event_id,
@@ -791,7 +803,7 @@ class History(object):
         # type: (...) -> None
         if event.state == "started":
             self.started_decision_id = event.id
-        if event.state == "completed":
+        elif event.state == "completed":
             self.completed_decision_id = event.id
 
     TYPE_TO_PARSER = {
@@ -820,6 +832,7 @@ class History(object):
 
     @staticmethod
     def get_event_id(event):
+        # type: (Dict[AnyStr, Any]) -> Optional[int]
         for event_id_key in (  # FIXME add a universal name?..
             "scheduled_id",
             "initiated_event_id",

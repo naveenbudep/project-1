@@ -5,7 +5,7 @@ from swf.models.event import Event
 class WorkflowExecutionEvent(Event):
     external_initiated_event_id: int
     external_workflow_execution: Dict[str, str]
-    input: str
+    # input: str
     signal_name: str
 
     # cancel_failed
