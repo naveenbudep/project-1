@@ -477,7 +477,7 @@ def start_decider(workflows, domain, task_list, log_level, nb_processes):
 @click.option("--middleware-post-execution", required=False, multiple=True)
 @click.option(
     "--poll-data",
-    help="Provide a base64 encoded json dump of the SWF poll response, instead of polling SWF",
+    help="Provide a base64-encoded JSON dump of the SWF poll response, instead of polling SWF",
 )
 @click.option(
     "--process-mode",

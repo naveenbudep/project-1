@@ -1,8 +1,53 @@
 Command Line
 ============
 
-Simpleflow comes with a `simpleflow` command-line utility that can be used to list workflows against SWF, boot decider or activity workers (with multiprocessing), and a few other goodies.
+Simpleflow comes with a `simpleflow` command-line utility that can be
+used to list workflows against SWF, boot decider or activity workers
+(with multiprocessing), and a few other goodies.
 
+
+Running Workflows
+-----------------
+
+### Launching Deciders
+
+```shell
+simpleflow decicer.start path.to.workflow.class
+```
+
+The SWF domain, task list, and number of processes can also be
+specified.
+
+### Launching Task Workers
+
+```shell
+simpleflow worker.start --task-list some-task-list
+```
+
+You must provide the task list, or a base64-encoded JSON dump of
+a SWF poll response.
+The SWF domain, number of processes, and heartbeat interval are also
+settable.
+
+Advanced options:
+* `--one-task`: shut down after running one task
+* `--poll-data TEXT`: base64-encoded JSON dump of a SWF poll response,
+  to simulate using SWF
+* `--process-mode kubernetes`: deprecated Kubernetes mode
+* `--middleware-pre-execution`, `--middleware-post-execution`: paths to
+  callables executed before and after each task
+
+### Launching Workflows
+
+```shell
+simpleflow workflow.start path.to.workflow.class
+```
+
+### All-in-one Launch
+
+```shell
+simpleflow standalone path.to.workflow.class
+```
 
 List Workflow Executions
 ------------------------
@@ -10,6 +55,14 @@ List Workflow Executions
     $ simpleflow workflow.list TestDomain
     basic-example-1438722273  basic  OPEN
 
+Workflows can also be selected by ID, type name and version, and using
+tags (some flags are exclusive):
+
+    simpleflow --header --format json workflow.filter TestDomain --status closed --tag a=1 --started-since 10 --limit 2
+
+```json
+[{"Child Policy":null,"Close Status":"COMPLETED","Decision Tasks Timeout":null,"Execution Timeout":null,"Input":null,"Run ID":"226iwQ5fZQ5tKVLHaDIKGJM1QknFmySDA5aGkKZjMo+Qo=","Status":"CLOSED","Tags":["a=1","b=foo"],"Task List":null,"Workflow ID":"basic","Workflow Type":"basic","Workflow Version":"example"}]
+```
 
 Workflow Execution Status
 -------------------------
@@ -49,30 +102,36 @@ You can profile the execution of the workflow with::
 Controlling SWF access
 ----------------------
 
-The SWF region is controlled by the environment variable `AWS_DEFAULT_REGION`. This variable
-comes from the legacy "simple-workflow" project. The option might be exposed through a
+The SWF region is controlled by the environment variable
+`AWS_DEFAULT_REGION`. This variable comes from the legacy
+"simple-workflow" project. The option might be exposed through a
 `--region` option in the future (if you want that, please open an issue).
 
-The SWF domain is controlled by the `--domain` on most simpleflow commands. It can also
-be set via the `SWF_DOMAIN` environment variable. In case both are supplied, the
-command-line value takes precedence over the environment variable.
+The SWF domain is controlled by the `--domain` on most simpleflow
+commands. It can also be set via the `SWF_DOMAIN` environment variable.
+In case both are supplied, the command-line value takes precedence over
+the environment variable.
 
-Note that some simpleflow commands expect the domain to be passed as a positionnal argument.
+Note that some simpleflow commands expect the domain to be passed as a
+positional argument.
 In that case the environment variable has no effect for now.
 
-The number of retries for accessing SWF can be controlled via `SWF_CONNECTION_RETRIES`
-(defaults to 5).
+The number of retries for accessing SWF can be controlled via
+`SWF_CONNECTION_RETRIES` (defaults to 5).
 
-The identity of SWF activity workers and deciders can be controlled via `SIMPLEFLOW_IDENTITY`
-which should be a JSON-serialized string representing `{ "key": "value" }` pairs that
-adds up (or override) the basic identity provided by simpleflow. If some value is null in
-this JSON map, then the key is removed from the final SWF identity.
+The identity of SWF activity workers and deciders can be controlled via
+`SIMPLEFLOW_IDENTITY`, which should be a JSON-serialized string
+representing `{ "key": "value" }` pairs that adds up (or override) the
+basic identity provided by simpleflow: user, hostname, PID, and
+executable path. If some value is null in this JSON map, then the key is
+removed from the final SWF identity.
 
 
 Controlling log verbosity
 -------------------------
 
-You can control log verbosity via the `LOG_LEVEL` environment variable. Default is `INFO`. For instance,
-the following command will start a decider with `DEBUG` logs:
+You can control log verbosity via the `LOG_LEVEL` environment variable.
+Default is `INFO`. For instance, the following command will start a
+decider with `DEBUG` logs:
 
     $ LOG_LEVEL=DEBUG simpleflow decider.start --domain TestDomain --task-list test examples.basic.BasicWorkflow

@@ -28,7 +28,7 @@ Features
 - Provides a local executor to check a workflow without Amazon SWF (see
   `simpleflow --local` command).
 - Provides decider and activity worker process for execution with Amazon SWF.
-- Ships with the `simpleflow` command. `simpleflow --help` for more information
+- Ships with the `simpleflow` command. `simpleflow --help` for more information.
   about the commands it supports.
 
 You can read more in the **Features** section of the documentation.
@@ -41,15 +41,16 @@ Please read and even run the `demo` script to have a quick glance of
 `simpleflow` commands. To run the `demo`  you will need to start decider
 and activity worker processes.
 
-Start a decider with::
+Start a decider in a terminal with:
 
     $ simpleflow decider.start --domain TestDomain --task-list test examples.basic.BasicWorkflow
 
-Start an activity worker with::
+Start an activity worker in another terminal or on another machine with:
 
     $ simpleflow worker.start --domain TestDomain --task-list quickstart
 
-Then execute `./extras/demo`.
+Then execute (again in another terminal or on another machine) 
+`./extras/demo`.
 
 
 More informations
