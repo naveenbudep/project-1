@@ -1,3 +1,4 @@
+# encoding: utf-8
 import sys
 from pprint import pformat
 from typing import TYPE_CHECKING
