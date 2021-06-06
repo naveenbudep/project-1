@@ -267,8 +267,12 @@ class Executor(executor.Executor):
         if state == "scheduled":
             pass
         elif state == "schedule_failed":
-            name = event["activity_type"]["name"]
-            version = event["activity_type"]["version"]
+            if "activity_type" in event:  # Compat
+                name = event["activity_type"]["name"]
+                version = event["activity_type"]["version"]
+            else:
+                name = event["name"]
+                version = event["version"]
             if (
                 event["cause"] == "ACTIVITY_TYPE_DOES_NOT_EXIST"
                 and (name, version) not in self.created_activity_types
@@ -1420,7 +1424,7 @@ class Executor(executor.Executor):
             run_id=run_id if workflow_id else self._run_id,
             extra_input=extra_input,
             *args,
-            **kwargs
+            **kwargs,
         )
 
     def wait_signal(self, name):
