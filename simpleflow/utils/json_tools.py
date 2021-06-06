@@ -39,8 +39,8 @@ def serialize_complex_object(obj):
     elif isinstance(obj, (set, frozenset)):
         return list(obj)
     raise TypeError(
-        "Type %s couldn't be serialized. This is a bug in simpleflow,"
-        " please file a new issue on GitHub!" % type(obj)
+        "Type %s couldn't be serialized. This might be a bug in simpleflow,"
+        " if so please file a new issue on GitHub!" % type(obj)
     )
 
 
@@ -54,43 +54,31 @@ def _resolve_proxy(obj):
     return obj
 
 
-def json_dumps(obj, pretty=False, compact=True, **kwargs):
+def json_dumps(obj, pretty=False, compact=True, sort_keys=True, **kwargs):
     """
     JSON dump to string.
-    :param obj:
-    :type obj: Any
-    :param pretty:
-    :type pretty: bool
-    :param compact:
-    :type compact: bool
-    :return:
-    :rtype: str
     """
     if "default" not in kwargs:
         kwargs["default"] = serialize_complex_object
     if pretty:
         kwargs["indent"] = 4
-        kwargs["sort_keys"] = True
         kwargs["separators"] = (",", ": ")
     elif compact:
         kwargs["separators"] = (",", ":")
-        kwargs["sort_keys"] = True
 
     try:
-        return json.dumps(obj, **kwargs)
+        return json.dumps(obj, sort_keys=sort_keys, **kwargs)
     except TypeError:
         # lazy_object_proxy.Proxy subclasses basestring: serialize_complex_object isn't called on python2
         # and some versions of pypy
         obj = _resolve_proxy(obj)
-        return json.dumps(obj, **kwargs)
+        return json.dumps(obj, sort_keys=sort_keys, **kwargs)
 
 
 def json_loads_or_raw(data):
     """
     Try to get a JSON object from a string.
     If this isn't JSON, return the raw string.
-    :param data: string; should be in JSON format
-    :return: JSON-decoded object or raw data
     """
     if not data:
         return None
