@@ -2,7 +2,7 @@ SWF Object Layer
 ================
 
 `simpleflow` includes a `swf` module that is an object-oriented wrapper for the
-`boto.swf` library, used to access the [Amazon Simple Workflow](http://aws.amazon.com/swf) service.
+`boto.swf` library, used to access the [Amazon Simple Workflow](https://aws.amazon.com/swf) service.
 
 It aims to provide:
 
@@ -22,7 +22,7 @@ Settings
 --------
 
 !!! bug
-    The informations in this "Settings" section may be outdated, they need some love.
+    The information in this "Settings" section may be outdated, it needs some love.
 
 Optional:
 
@@ -85,12 +85,12 @@ local and remote objects.
 )
 
 # a Domain model local instance has been created, but nothing has been
-# sent to amazon. To do so, you have to save it.
+# sent to Amazon. To do so, you have to save it.
 >>> D.save()
 ```
 
 Now you have a local `Domain` model object, and if no errors were raised, the `save` method have saved
-amazon-side. Sometimes you won't be able to know if the model you're manipulating has an upstream version:
+Amazon-side. Sometimes you won't be able to know if the model you're manipulating has an upstream version:
 whether you've acquired it through a queryset, or the remote object has been deleted for example.
 Fortunately, models are shipped with a set of functions to make sure your local objects keep synced and
 consistent.
@@ -112,7 +112,7 @@ ModelDiff()
 ```
 
 
-What if your local object is out of sync? Models `upstream` method will fetch the remote version of
+What if your local object is out of sync? Models' `upstream` method will fetch the remote version of
 your object and will build a new model instance using its attributes.
 
 ```python
@@ -133,12 +133,12 @@ ModelDiff()
 
 ### QuerySets
 
-Models can be retrieved and instantiated via querysets. To continue over the django comparison,
-they're behaving like django managers.
+Models can be retrieved and instantiated via querysets. To continue over the Django comparison,
+they're behaving like Django managers.
 
 ```python
-# As querying for models needs a valid connection to amazon service,
-# Queryset objects cannot act as classmethods proxy and have to be instantiated;
+# As querying for models needs a valid connection to Amazon service,
+# Queryset objects cannot act as classmethod proxies and have to be instantiated;
 # most of the time against a Domain model instance
 >>> from swf.querysets import DomainQuerySet, WorkflowTypeQuerySet
 
