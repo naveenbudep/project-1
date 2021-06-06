@@ -163,11 +163,16 @@ def _pull_jumbo_field(location):
 
 
 def _log_message_too_long(message):
+    message = truncate_string(message)
+    logger.error("Message too long, will raise: {}".format(message))
+
+
+def truncate_string(message):
     if len(message) > constants.MAX_LOG_FIELD:
         message = "{} <...truncated to {} chars>".format(
             message[: constants.MAX_LOG_FIELD], constants.MAX_LOG_FIELD
         )
-    logger.error("Message too long, will raise: {}".format(message))
+    return message
 
 
 # A few helpers to wrap common SWF fields
