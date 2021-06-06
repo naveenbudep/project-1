@@ -1,8 +1,6 @@
 import collections
 from typing import TYPE_CHECKING
 
-import swf.models.event
-import swf.models.history
 from simpleflow import logger
 
 if TYPE_CHECKING:
@@ -16,6 +14,9 @@ if TYPE_CHECKING:
         OrderedDict,
         Union,
     )
+
+    import swf.models.event
+    import swf.models.history
 
 
 def g_attr(event, s):
