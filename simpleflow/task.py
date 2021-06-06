@@ -13,11 +13,15 @@ from simpleflow.base import Submittable
 from simpleflow.history import History
 from simpleflow.utils import import_from_module
 
-from . import futures
+from . import futures, logger
 from .activity import Activity
 
 if TYPE_CHECKING:
-    from typing import Any, Dict, Optional, Type, Union  # NOQA
+    from typing import Any, AnyStr, Callable, Optional, Type
+
+    from . import Workflow
+    from .exceptions import TaskFailed
+    from .executor import Executor
 
 
 def get_actual_value(value):
@@ -31,9 +35,7 @@ def get_actual_value(value):
 
 @six.add_metaclass(abc.ABCMeta)
 class Task(Submittable):
-    """A Task represents a work that can be scheduled for execution.
-
-    """
+    """A Task represents a work that can be scheduled for execution."""
 
     @property
     @abc.abstractmethod
@@ -52,10 +54,6 @@ class Task(Submittable):
 class ActivityTask(Task):
     """
     Activity task.
-
-    :type activity: Activity
-    :type idempotent: Optional[bool]
-    :type id: Optional[str]
     """
 
     def __init__(self, activity, *args, **kwargs):
@@ -76,11 +74,11 @@ class ActivityTask(Task):
         self._kwargs = deepcopy(kwargs)
 
         self.activity = activity
-        self.idempotent = activity.idempotent
+        self.idempotent = activity.idempotent  # type: Optional[bool]
         self.context = kwargs.pop("context", None)
         self.args = self.resolve_args(*args)
         self.kwargs = self.resolve_kwargs(**kwargs)
-        self.id = None
+        self.id = None  # type: Optional[AnyStr]
 
     def load_middlewares(self, middlewares):
         if not middlewares:
@@ -150,13 +148,16 @@ class ActivityTask(Task):
 class WorkflowTask(Task):
     """
     Child workflow.
-
-    :type executor: type(simpleflow.executor.Executor)
-    :type workflow: type(simpleflow.workflow.Workflow)
-    :type id: Optional[str]
     """
 
-    def __init__(self, executor, workflow, *args, **kwargs):
+    def __init__(
+        self,
+        executor,  # type: Optional[Executor]
+        workflow,  # type: Type[Workflow]
+        *args,  # type: Any
+        **kwargs  # type: Any
+    ):
+        # type: (...) -> None
         # Keep original arguments for use in subclasses
         # For instance this helps casting a generic class to a simpleflow.swf.task,
         # see simpleflow.swf.task.WorkflowTask.from_generic_task() factory
@@ -166,14 +167,18 @@ class WorkflowTask(Task):
         self.executor = executor
         self.workflow = workflow
         self.idempotent = getattr(workflow, "idempotent", False)
-        get_workflow_id = getattr(workflow, "get_workflow_id", None)
+        get_workflow_id = getattr(
+            workflow, "get_workflow_id", None
+        )  # type: Optional[Callable[..., AnyStr]]
         self.args = self.resolve_args(*args)
         self.kwargs = self.resolve_kwargs(**kwargs)
 
         if get_workflow_id:
-            self.id = get_workflow_id(workflow, *self.args, **self.kwargs)
+            self.id = get_workflow_id(
+                workflow, *self.args, **self.kwargs
+            )  # type: ignore
         else:
-            self.id = None
+            self.id = None  # type: ignore
 
     @property
     def name(self):
@@ -330,60 +335,52 @@ class TaskFailureContext(object):
         cancel = 5
         handled = 6
 
-    a_task = attr.ib()  # type: Union[ActivityTask, WorkflowTask]
-    event = attr.ib()  # type: Dict[str, Any]
-    future = attr.ib()  # type: Optional[futures.Future]
-    exception_class = attr.ib()  # type: Type[Exception]
-    history = attr.ib(default=None)  # type: Optional[History]
-    decision = attr.ib(default=Decision.none)  # type: Optional[Decision]
-    retry_wait_timeout = attr.ib(default=None)  # type: Optional[int]
-    _task_error = attr.ib(default=None)  # type: Optional[str]
-    _task_error_type = attr.ib(default=None)  # type: Optional[Type[Exception]]
+    a_task = attr.ib()
+    event = attr.ib()
+    future = attr.ib()
+    exception_class = attr.ib()
+    history = attr.ib(default=None)
+    decision = attr.ib(default=Decision.none)
+    retry_wait_timeout = attr.ib(default=None)
+    _task_error = attr.ib(default=None)
+    _task_error_type = attr.ib(default=None)
 
     @property
     def retry_count(self):
-        # type: () -> Optional[int]
         return self.event.get("retry")
 
     @property
     def attempt_number(self):
-        # type: () -> int
         return self.event.get("retry", 0) + 1
 
     @property
     def task_name(self):
-        # type: () -> Optional[str]
         if hasattr(self.a_task, "payload"):
-            return self.a_task.payload.name
+            return self.a_task.payload.name  # typing: ignore
         if hasattr(self.a_task, "name"):
             return self.a_task.name
         return None
 
     @property
     def exception(self):
-        # type: () -> Optional[Exception]
-        return self.future.exception
+        return self.future.exception if self.future else None
 
     @property
     def current_started_decision_id(self):
-        # type: () -> Optional[int]
         return self.history.started_decision_id if self.history else None
 
     @property
     def last_completed_decision_id(self):
-        # type: () -> Optional[int]
         return self.history.completed_decision_id if self.history else None
 
     @property
     def task_error(self):
-        # type: () -> str
         if self._task_error is None:
             self._cache_error()
         return self._task_error
 
     @property
     def task_error_type(self):
-        # type: () -> Optional[Type[Exception]]
         if self._task_error is None:
             self._cache_error()
         return self._task_error_type
@@ -408,27 +405,22 @@ class TaskFailureContext(object):
 
     @property
     def id(self):
-        # type: () -> Optional[int]
         event = self.event
         return History.get_event_id(event)
 
     def decide_abort(self):
-        # type: () -> TaskFailureContext
         self.decision = self.Decision.abort
         return self
 
     def decide_ignore(self):
-        # type: () -> TaskFailureContext
         self.decision = self.Decision.ignore
         return self
 
     def decide_cancel(self):
-        # type: () -> TaskFailureContext
         self.decision = self.Decision.cancel
         return self
 
     def decide_retry(self, retry_wait_timeout=0):
-        # type: (Optional[int]) -> TaskFailureContext
         self.decision = (
             self.Decision.retry_now
             if not retry_wait_timeout
@@ -438,7 +430,6 @@ class TaskFailureContext(object):
         return self
 
     def decide_handled(self, a_task, future=None):
-        # type: (Union[ActivityTask, WorkflowTask], Optional[futures.Future]) -> TaskFailureContext
         self.a_task = a_task
         self.future = future
         self.decision = self.Decision.handled

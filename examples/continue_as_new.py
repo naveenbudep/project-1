@@ -1,12 +1,23 @@
+import time
 from datetime import datetime
 
 import pytz
 
-from examples.basic import Delay
 from simpleflow import Workflow, activity, logger
 from simpleflow.canvas import Group
 from simpleflow.constants import MINUTE
 from simpleflow.swf.task import ContinueAsNewWorkflowTask
+
+
+@activity.with_attributes(task_list="quickstart", version="example", idempotent=True)
+class IdempotentDelay(object):
+    def __init__(self, t, x):
+        self.t = t
+        self.x = x
+
+    def execute(self):
+        time.sleep(self.t)
+        return self.x
 
 
 @activity.with_attributes(task_list="quickstart", version="example", idempotent=False)
@@ -17,19 +28,16 @@ def datetime_now():
 
 
 class ContinueAsNewBaseWorkflow(Workflow):
+    pass
+
+
+class ContinueAsNewWorkflow(ContinueAsNewBaseWorkflow):
     name = "continue_as_new"
 
     version = "example"
     task_list = "example"
     execution_timeout = 5 * MINUTE
 
-    def continue_as_new(self, past_history=None, **kwargs):
-        return ContinueAsNewWorkflowTask(
-            self.executor, type(self), past_history=past_history, **kwargs
-        )
-
-
-class ContinueAsNewWorkflow(ContinueAsNewBaseWorkflow):
     def run(self, *args, **kwargs):
         i = kwargs.get("i", 0)
         while i < 5:
@@ -46,24 +54,26 @@ class ContinueAsNewWorkflow(ContinueAsNewBaseWorkflow):
             timer = self.start_timer("a_timer", 6 - i)
             group = Group()
             group.append(timer)
-            group.append(Delay, 7 - i, 0)
+            group.append(IdempotentDelay, 2, 0)
             start = self.submit(datetime_now).result
             logger.info("Wait... %r", self.submit(group).result)
             end = self.submit(datetime_now).result
             logger.info("Elapsed: %s", end - start)
             task = self.c_as_n(i=i, **kwargs)
-            logger.info(
-                "Start as new workflow... %r",
-                self.submit(task).result,
-            )
+            logger.info("Start as new workflow...")
+            self.submit(task).wait()
+
+    def continue_as_new(self, keep_history=False, **kwargs):
+        return ContinueAsNewWorkflowTask(
+            self.executor, type(self), keep_history=keep_history, **kwargs
+        )
 
     def c_as_n(self, **kwargs):
         return self.continue_as_new(**kwargs)
 
 
 class ContinueAsNewWorkflowWithHistory(ContinueAsNewWorkflow):
+    name = "continue_as_new_with_history"
+
     def c_as_n(self, **kwargs):
-        logger.info("c_as_n: kwargs=%r", kwargs)
-        return self.continue_as_new(
-            past_history=self.executor.history.to_dict(), **kwargs
-        )
+        return self.continue_as_new(keep_history=True, **kwargs)

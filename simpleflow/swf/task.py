@@ -104,17 +104,8 @@ class ActivityTask(task.ActivityTask, SwfTask):
 
     @classmethod
     def get_activity_type(cls, domain, name, version):
-        # type: (swf.models.Domain, str, str) -> swf.models.ActivityType
         """
         Cache known ActivityType's to remove useless latency.
-        :param domain:
-        :type domain:
-        :param name:
-        :type name:
-        :param version:
-        :type version:
-        :return:
-        :rtype:
         """
         key = (domain.name, name, version)
         if key not in cls.cached_models:
@@ -134,7 +125,7 @@ class NonPythonicActivityTask(ActivityTask):
     def __init__(self, activity, *args, **kwargs):
         if args and kwargs:
             raise ValueError("This task type doesn't support both *args and **kwargs")
-        super(ActivityTask, self).__init__(activity, *args, **kwargs)
+        super(NonPythonicActivityTask, self).__init__(activity, *args, **kwargs)
 
     def get_input(self):
         return self.kwargs or self.args
@@ -181,15 +172,6 @@ class WorkflowTask(task.WorkflowTask, SwfTask):
     def schedule(self, domain, task_list=None, executor=None, **kwargs):
         """
         Schedule a child workflow.
-
-        :param domain:
-        :type domain: swf.models.Domain
-        :param task_list:
-        :type task_list: Optional[str]
-        :param executor:
-        :type executor: simpleflow.swf.executor.Executor
-        :return:
-        :rtype: list[swf.models.decision.Decision]
         """
         workflow = self.workflow
         model = self.get_workflow_type(
@@ -232,14 +214,6 @@ class WorkflowTask(task.WorkflowTask, SwfTask):
         # type: (swf.models.Domain, str, str) -> swf.models.WorkflowType
         """
         Cache known WorkflowType's to remove useless latency.
-        :param domain:
-        :type domain:
-        :param name:
-        :type name:
-        :param version:
-        :type version:
-        :return:
-        :rtype:
         """
         key = (domain.name, name, version)
         if key not in cls.cached_models:
@@ -252,16 +226,13 @@ class WorkflowTask(task.WorkflowTask, SwfTask):
 
 
 class ContinueAsNewWorkflowTask(WorkflowTask):
-    def __init__(
-        self, executor, workflow, past_history=None, keep_steps=False, *args, **kwargs
-    ):
+    def __init__(self, executor, workflow, keep_history=False, *args, **kwargs):
         super(ContinueAsNewWorkflowTask, self).__init__(
             executor, workflow, *args, **kwargs
         )
-        self.past_history = past_history
-        self.keep_steps = keep_steps
+        self.keep_history = keep_history
 
-    def schedule(self, domain, task_list=None, executor=None, *args, **kwargs):
+    def schedule(self, domain, task_list=None, executor=None, **kwargs):
         workflow = self.workflow
         tag_list = self.tag_list
         if tag_list == Workflow.INHERIT_TAG_LIST and executor:
@@ -270,12 +241,10 @@ class ContinueAsNewWorkflowTask(WorkflowTask):
         input = self.get_input()
         if "meta" not in input:
             input["meta"] = {}
-        if self.past_history:
-            input["meta"]["past_history"] = self.past_history
-        if self.keep_steps:
-            input["meta"]["keep_steps"] = self.keep_steps  # TODO: use initial run id
-        decision = WorkflowExecutionDecision(
-            "continue_as_new",
+        if self.keep_history:
+            input["meta"]["past_history"] = executor.history.to_dict()
+        decision = WorkflowExecutionDecision()
+        decision.continue_as_new(
             child_policy=getattr(workflow, "child_policy", CHILD_POLICIES.TERMINATE),
             execution_timeout=getattr(workflow, "execution_timeout", None),
             task_timeout=settings.WORKFLOW_DEFAULT_DECISION_TASK_TIMEOUT,  # type: ignore
@@ -365,7 +334,6 @@ class MarkerTask(task.MarkerTask, SwfTask):
 
     @classmethod
     def from_generic_task(cls, a_task):
-        # type: (task.MarkerTask) -> MarkerTask
         return cls(a_task.name, *a_task.args, **a_task.kwargs)
 
     def __init__(self, name, details=None):
@@ -386,7 +354,6 @@ class TimerTask(task.TimerTask, SwfTask):
 
     @classmethod
     def from_generic_task(cls, a_task):
-        # type: (task.TimerTask) -> TimerTask
         return cls(a_task.timer_id, a_task.timeout, a_task.control)
 
     def __init__(self, timer_id, timeout, control):
@@ -407,7 +374,6 @@ class CancelTimerTask(task.CancelTimerTask, SwfTask):
 
     @classmethod
     def from_generic_task(cls, a_task):
-        # type: (task.CancelTimerTask) -> CancelTimerTask
         return cls(a_task.timer_id)
 
     def __init__(self, timer_id):

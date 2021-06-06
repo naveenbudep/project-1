@@ -87,7 +87,10 @@ setup(
     author_email="tech@botify.com",
     url="https://github.com/botify-labs/simpleflow",
     packages=find_packages(exclude=("test*",)),
-    package_dir={"simpleflow": "simpleflow", "swf": "swf",},
+    package_dir={
+        "simpleflow": "simpleflow",
+        "swf": "swf",
+    },
     include_package_data=True,
     install_requires=DEPS,
     license="MIT License",
@@ -105,7 +108,13 @@ setup(
         "Programming Language :: Python :: 3.4",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
     ],
-    entry_points={"console_scripts": ["simpleflow = simpleflow.command:cli",]},
+    entry_points={
+        "console_scripts": [
+            "simpleflow = simpleflow.command:cli",
+        ]
+    },
 )

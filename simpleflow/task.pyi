@@ -1,0 +1,136 @@
+from enum import Enum
+from typing import Any, AnyStr, Callable, Dict, List, Optional, Tuple, Type, Union
+
+from simpleflow import Activity, Workflow
+from simpleflow.base import Submittable
+from simpleflow.exceptions import TaskFailed
+from simpleflow.executor import Executor
+from simpleflow.futures import Future
+from simpleflow.history import History
+
+def get_actual_value(value: Union[Future, Any]) -> Any: ...
+
+class Task(Submittable):
+    @property
+    def name(self) -> AnyStr: ...
+    @staticmethod
+    def resolve_args(*args: Any) -> List[Any]: ...
+    @staticmethod
+    def resolve_kwargs(**kwargs: Any) -> Dict[AnyStr, Any]: ...
+
+class ActivityTask(Task):
+    _args: Tuple[Any]
+    _kwargs: Dict[AnyStr, Any]
+    activity: Activity
+    idempotent: Optional[bool]
+    context: Optional[Dict[AnyStr, Any]]
+    args: List[Any]
+    kwargs: Dict[AnyStr, Any]
+    id: Optional[AnyStr]
+    pre_execute_funcs: List[Callable[..., None]]
+    post_execute_funcs: List[Callable[..., None]]
+    def __init__(self, activity: Activity, *args, **kwargs) -> None: ...
+    def __repr__(self) -> str: ...
+    def execute(self) -> Optional[Union[Dict[str, str], int, str]]: ...
+    def load_middlewares(self, middlewares: Optional[Dict[str, List[str]]]) -> None: ...
+
+class WorkflowTask(Task):
+    _args: Tuple[Any]
+    _kwargs: Dict[AnyStr, Any]
+    args: Tuple[Any]
+    kwargs: Dict[AnyStr, Any]
+    executor: Optional[Executor]
+    workflow: Type[Workflow]
+    idempotent: bool
+    id: Optional[AnyStr]
+    def __init__(
+        self, executor: Optional[Executor], workflow: Type[Workflow], *args, **kwargs
+    ) -> None: ...
+    def __repr__(self) -> str: ...
+    def execute(self) -> Any: ...
+
+class ChildWorkflowTask(WorkflowTask):
+    # FIXME wrongly specified? (pycharm doesn't like) def __init__(self, workflow: Type[Workflow], *args, **kwargs) -> None: ...
+    pass
+
+class SignalTask(Task):
+    _name: str
+    args: List[Any]
+    kwargs: Dict
+    def __init__(self, name: str, *args, **kwargs) -> None: ...
+    def execute(self) -> None: ...
+    @property
+    def name(self) -> str: ...
+
+class MarkerTask(Task):
+    _name: str
+    args: List[Any]
+    kwargs: Dict
+    def __init__(self, name: str, details: Any) -> None: ...
+    @property
+    def details(self) -> Any: ...
+    def execute(self) -> None: ...
+    @property
+    def name(self) -> str: ...
+
+class TimerTask(Task):
+    timer_id: AnyStr
+    timeout: int
+    control: Optional[Dict]
+    args: Tuple
+    kwargs: Dict
+    def __init__(
+        self, timer_id: AnyStr, timeout: int, control: Optional[Dict] = None
+    ) -> None: ...
+    @property
+    def name(self) -> AnyStr: ...
+    @property
+    def id(self) -> AnyStr: ...
+    def __repr__(self) -> AnyStr: ...
+    def execute(self) -> None: ...
+
+class CancelTimerTask(Task):
+    timer_id: AnyStr
+    args: Tuple
+    kwargs: Dict
+    def __init__(self, timer_id: AnyStr) -> None: ...
+
+class TaskFailureContext:
+    class Decision(Enum): ...
+    a_task: Union[ActivityTask, WorkflowTask]
+    event: Dict[str, Any]
+    future: Optional[Future]
+    exception_class: Type[Exception]
+    history: Optional[History]
+    decision: Optional[Decision]
+    retry_wait_timeout: Optional[int]
+    _task_error: Optional[str]
+    _task_error_type: Optional[Type[Exception]]
+    @property
+    def retry_count(self) -> Optional[int]: ...
+    @property
+    def attempt_number(self) -> int: ...
+    @property
+    def task_name(self) -> Optional[str]: ...
+    @property
+    def exception(self) -> Union[None, TaskFailed, Exception]: ...
+    @property
+    def current_started_decision_id(self) -> Optional[int]: ...
+    @property
+    def last_completed_decision_id(self) -> Optional[int]: ...
+    @property
+    def task_error(self) -> Optional[str]: ...
+    @property
+    def task_error_type(self) -> Optional[Type[Exception]]: ...
+    def _cache_error(self): ...
+    @property
+    def id(self) -> Optional[int]: ...
+    def decide_abort(self) -> TaskFailureContext: ...
+    def decide_ignore(self) -> TaskFailureContext: ...
+    def decide_cancel(self) -> TaskFailureContext: ...
+    def decide_retry(
+        self, retry_wait_timeout: Optional[int] = 0
+    ) -> TaskFailureContext: ...
+    def decide_handled(
+        self, a_task: Union[ActivityTask, WorkflowTask], future: Optional[Future] = None
+    ) -> TaskFailureContext: ...

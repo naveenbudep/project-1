@@ -74,6 +74,7 @@ nav:
       - Tags: features/tags.md
       - Error Handling: features/error_handling.md
       - Middleware: features/middleware.md
+      - Continue as New: features/continue_as_new.md
   - Development: development.md
   - Contributing: contributing.md
   - License: license.md
