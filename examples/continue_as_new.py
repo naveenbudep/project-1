@@ -1,10 +1,19 @@
-import datetime
+from datetime import datetime
+
+import pytz
 
 from examples.basic import Delay
-from simpleflow import Workflow, logger
+from simpleflow import Workflow, activity, logger
 from simpleflow.canvas import Group
 from simpleflow.constants import MINUTE
 from simpleflow.swf.task import ContinueAsNewWorkflowTask
+
+
+@activity.with_attributes(task_list="quickstart", version="example", idempotent=False)
+def datetime_now():
+    now = datetime.now(tz=pytz.utc)
+    logger.info("datetime_now: %s", now)
+    return now.timestamp()
 
 
 class ContinueAsNewBaseWorkflow(Workflow):
@@ -38,9 +47,10 @@ class ContinueAsNewWorkflow(ContinueAsNewBaseWorkflow):
             group = Group()
             group.append(timer)
             group.append(Delay, 7 - i, 0)
-            now = datetime.datetime.now()
+            start = self.submit(datetime_now).result
             logger.info("Wait... %r", self.submit(group).result)
-            logger.info("Elapsed: %s", datetime.datetime.now() - now)
+            end = self.submit(datetime_now).result
+            logger.info("Elapsed: %s", end - start)
             task = self.c_as_n(i=i, **kwargs)
             logger.info(
                 "Start as new workflow... %r",
