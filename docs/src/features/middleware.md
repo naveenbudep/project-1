@@ -1,7 +1,7 @@
 # Middleware
 
 !!! warning
-    This feature is in _beta_ mode and subject to changes. Any feedback is appreciated.
+    This feature is in _beta_ mode and subject to change. Any feedback is appreciated.
 
 ## Presentation
 

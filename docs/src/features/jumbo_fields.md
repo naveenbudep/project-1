@@ -2,7 +2,7 @@ Jumbo Fields
 ============
 
 !!! warning
-    This feature is in _beta_ mode and subject to changes. Any feedback is appreciated.
+    This feature is in _beta_ mode and subject to change. Any feedback is appreciated.
 
 For some use cases, you want to be able to have fields larger than what SWF accepts
 (which is maximum 32K bytes on the largest ones, `input` and `result`, and lower for
