@@ -66,6 +66,7 @@ DEPS = [
     # 'PyYAML',
     'enum34;python_version<"3.4"',
     'subprocess32>=3.5.0;python_version<"3.5"',
+    "zstd",
 ]
 
 tests_require = []

@@ -1,6 +1,7 @@
 import swf.models
 import swf.models.decision
 from simpleflow import Workflow, logger, settings, task
+from simpleflow.utils import json_dumps
 from swf.models.decision import WorkflowExecutionDecision
 from swf.models.workflow import CHILD_POLICIES
 
@@ -242,7 +243,29 @@ class ContinueAsNewWorkflowTask(WorkflowTask):
         if "meta" not in input:
             input["meta"] = {}
         if self.keep_history:
-            input["meta"]["past_history"] = executor.history.to_dict()
+            past_history = executor.history.to_dict()
+            # TODO
+            #  * directly push on S3?
+            #  * be agnostic w.r.t. zstd/python-zstandard/pyzstd
+            try:
+                import base64
+
+                import zstd
+
+                past_history = base64.b64encode(
+                    zstd.compress(
+                        json_dumps(
+                            past_history,
+                            pretty=False,
+                            compact=True,
+                            sort_keys=False,
+                        ).encode("utf-8"),
+                        6,  # Arbitrary level
+                    )
+                )
+            except Exception:
+                pass
+            input["meta"]["past_history"] = past_history
         decision = WorkflowExecutionDecision()
         decision.continue_as_new(
             child_policy=getattr(workflow, "child_policy", CHILD_POLICIES.TERMINATE),

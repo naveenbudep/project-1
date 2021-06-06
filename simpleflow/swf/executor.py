@@ -19,6 +19,7 @@ import swf.responses
 from simpleflow import compat, exceptions, executor, format, futures, logger, task
 from simpleflow.activity import PRIORITY_NOT_SET, Activity
 from simpleflow.base import Submittable
+from simpleflow.format import truncate_string
 from simpleflow.history import History
 from simpleflow.marker import Marker
 from simpleflow.signal import WaitForSignal
@@ -1180,6 +1181,32 @@ class Executor(executor.Executor):
         )
         if continued_execution_run_id:
             past_history = input.get("meta", {}).get("past_history")
+            logger.debug(
+                "continued_execution_run_id %s; past_history=%s",
+                continued_execution_run_id,
+                truncate_string(str(past_history)),
+            )
+            try:
+                import base64
+
+                import zstd
+
+                past_history = json.loads(
+                    zstd.decompress(base64.b64decode(past_history))
+                )
+                logger.debug(
+                    "continued_execution_run_id %s; decoded past_history=%s",
+                    continued_execution_run_id,
+                    truncate_string(str(past_history)),
+                )
+            except Exception as e:
+                logger.debug(
+                    "continued_execution_run_id %s; cannot decode past_history, exception: %s %s",
+                    continued_execution_run_id,
+                    type(e).__name__,
+                    e,
+                )
+                past_history = None
 
         self._history = History(history, past_history)
         self._history.parse()
