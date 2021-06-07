@@ -1451,7 +1451,7 @@ class Executor(executor.Executor):
             run_id=run_id if workflow_id else self._run_id,
             extra_input=extra_input,
             *args,
-            **kwargs,
+            **kwargs
         )
 
     def wait_signal(self, name):
