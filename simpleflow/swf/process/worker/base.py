@@ -1,4 +1,5 @@
 import json
+import logging
 import multiprocessing
 import os
 import sys
@@ -232,7 +233,11 @@ class ActivityWorker(object):
             return poller.fail_with_retry(token, task, reason=reason, details=details)
 
         try:
-            logger.info("completing activity")
+            logger.info(
+                "completing activity id=%s worker pid=%d",
+                task.activity_id,
+                os.getpid(),
+            )
             poller.complete_with_retry(token, result)
         except Exception as err:
             logger.exception("complete error")
@@ -333,10 +338,12 @@ def spawn(poller, token, task, middlewares=None, heartbeat=60):
     :type heartbeat: int
     """
     logger.info(
-        "spawning new activity worker pid={} heartbeat={}".format(
-            os.getpid(), heartbeat
-        )
+        "spawning new activity id=%s worker pid=%d heartbeat=%s",
+        task.activity_id,
+        os.getpid(),
+        heartbeat,
     )
+    multiprocessing.log_to_stderr(logging.INFO)
     worker = multiprocessing.Process(
         target=process_task, args=(poller, token, task, middlewares)
     )
